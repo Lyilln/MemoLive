@@ -1,194 +1,164 @@
 import React, { useState } from 'react';
-import { Sparkles, Settings, Play, Music, Trash2, AlertCircle } from 'lucide-react';
+import { Settings, Zap, Shield, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 
-// --- UI 組件 ---
-const NeuBox = ({ children, className = '', pressed = false, onClick }) => (
+// --- 簡單 UI ---
+const NeuBox = ({ children, className = '', onClick }) => (
   <div 
     onClick={onClick}
-    className={`
-      ${className} transition-all duration-300 ease-in-out rounded-[20px]
-      ${pressed 
-        ? 'bg-[#D0D3EC] shadow-[inset_6px_6px_12px_#aeb1cb,inset_-6px_-6px_12px_#ffffff]' 
-        : 'bg-[#D0D3EC] shadow-[8px_8px_16px_#aeb1cb,-8px_-8px_16px_#ffffff]'}
-      ${onClick ? 'cursor-pointer active:scale-[0.98]' : ''}
-    `}
+    className={`bg-[#D0D3EC] shadow-[8px_8px_16px_#aeb1cb,-8px_-8px_16px_#ffffff] rounded-[20px] ${className} ${onClick ? 'cursor-pointer active:scale-95' : ''}`}
   >
     {children}
   </div>
 );
 
-// --- 音樂播放器 ---
-const MusicPlayer = ({ keyword }) => {
-  const [isPlaying, setIsPlaying] = useState(false);
-  if (!keyword) return null;
-  
-  return (
-    <div className="fixed top-4 right-4 z-50 animate-fade-in">
-      <NeuBox className="p-3 flex items-center gap-3 pr-5" onClick={() => setIsPlaying(true)}>
-        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isPlaying ? 'text-purple-600' : 'text-gray-500'}`}>
-          {isPlaying ? <Music className="animate-bounce" size={20}/> : <Play size={20} fill="currentColor"/>}
-        </div>
-        <div className="flex flex-col">
-          <span className="text-xs font-bold text-gray-500">BGM 伴讀中</span>
-          <span className="text-sm font-black text-purple-600 line-clamp-1 max-w-[120px]">{keyword}</span>
-          <span className="text-[10px] text-gray-400">{isPlaying ? "播放中..." : "點擊播放"}</span>
-        </div>
-      </NeuBox>
-      {isPlaying && (
-        <iframe 
-          width="1" height="1" 
-          src={`https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(keyword + " audio")}&autoplay=1`}
-          className="absolute opacity-0 pointer-events-none"
-        ></iframe>
-      )}
-    </div>
-  );
-};
-
 const App = () => {
-  const [note, setNote] = useState("");
-  const [generatedText, setGeneratedText] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [debugMsg, setDebugMsg] = useState(""); // 除錯訊息
   const [apiKey, setApiKey] = useState(localStorage.getItem("gemini_key") || "");
+  const [logs, setLogs] = useState<string[]>(["等待測試... 請先貼上 API Key"]);
+  const [successModel, setSuccessModel] = useState("");
+  const [note, setNote] = useState("");
   const [showSettings, setShowSettings] = useState(false);
-  const [musicKeyword, setMusicKeyword] = useState("");
 
   const saveKey = (e) => {
-    setApiKey(e.target.value);
-    localStorage.setItem("gemini_key", e.target.value);
+    const val = e.target.value.trim(); // 自動刪除前後空白
+    setApiKey(val);
+    localStorage.setItem("gemini_key", val);
   };
 
-  // ★★★ 萬能鑰匙核心邏輯 ★★★
-  const generateStory = async () => {
-    if (!apiKey) return alert("請先設定 API Key！");
-    setIsLoading(true);
-    setGeneratedText("");
-    setMusicKeyword("");
-    setDebugMsg("正在嘗試連線...");
+  const addLog = (msg) => setLogs(prev => [msg, ...prev]);
 
-    // 定義我們要嘗試的所有門 (模型型號)
-    const modelsToTry = [
-      "gemini-1.5-flash",      // 首選
-      "gemini-1.5-flash-001",  // 備選 1
-      "gemini-pro",            // 備選 2 (最穩)
-      "gemini-1.0-pro"         // 備選 3
-    ];
+  // ★ 核心測試函數：直接用 fetch 打特定網址 ★
+  const testConnection = async (modelName, version) => {
+    if (!apiKey) return alert("請先輸入 API Key");
+    
+    addLog(`🔵 正在測試: ${modelName} (${version})...`);
+    
+    // 構造網址：強制指定 v1 或 v1beta
+    const url = `https://generativelanguage.googleapis.com/${version}/models/${modelName}:generateContent?key=${apiKey}`;
+    
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: "哈囉，請回傳「測試成功」四個字就好。" }] }]
+        })
+      });
 
-    const promptText = `
-      角色：專業同人小說家。
-      任務：
-      1. 分析使用者筆記：${note}
-      2. 若提到特定歌手/團體，輸出該名字為音樂關鍵字；若為影視劇則輸出 'OST'。
-      3. [重要] 回應格式：第一行必須是 [MUSIC: 關鍵字]，第二行開始才是小說內容。
-      4. 續寫 1500 字以上繁體中文小說，風格需模仿使用者。
-    `;
+      const data = await response.json();
 
-    // 迴圈嘗試所有模型
-    for (const modelName of modelsToTry) {
-      try {
-        setDebugMsg(`正在嘗試模型: ${modelName}...`);
-        
-        // 這裡改用 v1 (Stable) 接口，不要用 v1beta
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${apiKey}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: promptText }] }]
-            })
-          }
-        );
-
-        const data = await response.json();
-
-        // 如果成功了，就直接跳出迴圈
-        if (response.ok) {
-          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (text) {
-             // 解析音樂
-            const musicMatch = text.match(/^\[MUSIC:\s*(.*?)\]/);
-            let content = text;
-            if (musicMatch) {
-              setMusicKeyword(musicMatch[1]);
-              content = text.replace(/^\[MUSIC:\s*.*?\]/, '').trim();
-            }
-            setGeneratedText(content);
-            setDebugMsg(`成功連線！使用模型: ${modelName}`);
-            setIsLoading(false);
-            return; // ★ 成功結束！
-          }
-        } else {
-          // 如果失敗，紀錄錯誤並繼續下一個
-          console.log(`${modelName} 失敗:`, data);
-        }
-
-      } catch (error) {
-        console.error(error);
+      if (response.ok) {
+        addLog(`✅ 成功！${modelName} 是活的！`);
+        setSuccessModel(modelName); // 記住這個成功的型號
+        alert(`恭喜！找到可用線路：${modelName}\n請立刻開始寫作！`);
+      } else {
+        addLog(`❌ 失敗 (${modelName}): ${data.error?.message || response.statusText}`);
       }
+    } catch (e) {
+      addLog(`❌ 連線錯誤: ${e.message}`);
     }
+  };
 
-    // 如果跑到這裡，代表全部都失敗了
-    setIsLoading(false);
-    alert("所有模型都嘗試失敗。\n請確認你的 API Key 是否正確。\n(若為新申請的 Key，可能需要等幾分鐘才生效)");
-    setDebugMsg("連線全數失敗");
+  // ★ 最終寫作函數：只用測試成功的那個型號 ★
+  const generateStory = async () => {
+    if (!successModel) return alert("請先點擊上方按鈕測試，找到綠燈的線路！");
+    
+    addLog(`🚀 使用 ${successModel} 開始生成...`);
+    const version = successModel.includes("1.5") ? "v1beta" : "v1";
+    const url = `https://generativelanguage.googleapis.com/${version}/models/${successModel}:generateContent?key=${apiKey}`;
+    
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `(請續寫這段筆記，並在開頭標註 [MUSIC: 關鍵字]): ${note}` }] }]
+        })
+      });
+      const data = await response.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) {
+        addLog("🎉 生成完成！");
+        setNote(text); // 直接顯示在框框裡
+      }
+    } catch (e) {
+      alert("生成失敗");
+    }
   };
 
   return (
-    <div className="min-h-screen bg-[#D0D3EC] text-[#5b5d7e] p-6 font-sans relative overflow-x-hidden">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-black text-purple-600">MemoLive</h1>
-          <p className="text-xs font-bold opacity-50">AUTO-RETRY EDITION</p>
-        </div>
-        <NeuBox className="w-12 h-12 flex items-center justify-center" onClick={() => setShowSettings(!showSettings)}>
-          <Settings size={20} />
+    <div className="min-h-screen bg-[#D0D3EC] text-[#5b5d7e] p-6 font-sans">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-black text-purple-600">API 線路診斷器</h1>
+        <Settings className="cursor-pointer" onClick={() => setShowSettings(!showSettings)}/>
+      </div>
+
+      {/* 設定區 */}
+      {(showSettings || !apiKey) && (
+        <NeuBox className="p-4 mb-6">
+          <p className="mb-2 font-bold text-sm">步驟 1: 貼上 API Key</p>
+          <input 
+            type="password" 
+            placeholder="貼上你的 AIza..." 
+            value={apiKey} 
+            onChange={saveKey}
+            className="w-full bg-white/50 p-2 rounded-lg outline-none font-mono text-sm"
+          />
+        </NeuBox>
+      )}
+
+      {/* 診斷按鈕區 */}
+      <div className="grid grid-cols-1 gap-4 mb-6">
+        <p className="font-bold text-sm">步驟 2: 點擊測試 (直到出現綠燈)</p>
+        
+        <NeuBox className="p-4 flex items-center gap-3" onClick={() => testConnection('gemini-1.5-flash', 'v1beta')}>
+          <Zap className="text-yellow-600" /> 
+          <div>
+            <div className="font-bold">測試線路 A (主力)</div>
+            <div className="text-xs opacity-60">Gemini 1.5 Flash (v1beta)</div>
+          </div>
+        </NeuBox>
+
+        <NeuBox className="p-4 flex items-center gap-3" onClick={() => testConnection('gemini-1.5-flash-001', 'v1beta')}>
+          <Shield className="text-blue-600" />
+          <div>
+            <div className="font-bold">測試線路 B (備用)</div>
+            <div className="text-xs opacity-60">Gemini 1.5 Flash 001 (v1beta)</div>
+          </div>
+        </NeuBox>
+
+        <NeuBox className="p-4 flex items-center gap-3" onClick={() => testConnection('gemini-pro', 'v1beta')}>
+          <CheckCircle className="text-green-600" />
+          <div>
+            <div className="font-bold">測試線路 C (保底)</div>
+            <div className="text-xs opacity-60">Gemini 1.0 Pro (最穩)</div>
+          </div>
         </NeuBox>
       </div>
 
-      {showSettings && (
-        <div className="mb-6 animate-slide-down">
-          <NeuBox className="p-4" pressed>
-            <input 
-              type="password" placeholder="貼上 Google Gemini API Key" 
-              value={apiKey} onChange={saveKey}
-              className="w-full bg-transparent outline-none text-sm font-mono"
-            />
-          </NeuBox>
-        </div>
-      )}
+      {/* 寫作區 (只有測試成功才會解鎖) */}
+      <div className={`transition-all ${successModel ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
+        <p className="font-bold text-sm mb-2">步驟 3: 開始寫作 ({successModel || "鎖定中"})</p>
+        <NeuBox className="p-4 min-h-[200px] mb-4">
+          <textarea 
+            className="w-full h-[150px] bg-transparent outline-none resize-none"
+            placeholder="測試成功後，在這裡貼上筆記，按下生成..."
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+        </NeuBox>
+        <NeuBox className="p-4 flex justify-center font-bold text-purple-700" onClick={generateStory}>
+          ✨ 開始生成
+        </NeuBox>
+      </div>
 
-      <MusicPlayer keyword={musicKeyword} />
-
-      {!generatedText && (
-        <div className="space-y-6">
-          <NeuBox className="p-4 min-h-[300px]" pressed>
-            <textarea 
-              className="w-full h-full min-h-[300px] bg-transparent outline-none resize-none text-lg leading-relaxed placeholder-gray-400"
-              placeholder="貼上你的筆記... 系統會自動尋找可用的 AI 模型..."
-              value={note} onChange={(e) => setNote(e.target.value)}
-            />
-          </NeuBox>
-          
-          <div className="text-center text-xs text-purple-500 font-mono h-4">{debugMsg}</div>
-
-          <NeuBox onClick={generateStory} className="py-4 flex justify-center gap-2 font-bold text-purple-600 active:scale-95">
-             {isLoading ? "正在自動切換線路..." : <><Sparkles /> 開始生成 (自動掃描)</>}
-          </NeuBox>
-        </div>
-      )}
-
-      {generatedText && (
-        <div className="animate-fade-in space-y-6 pb-20">
-          <NeuBox className="p-6 leading-loose text-justify text-lg whitespace-pre-wrap">
-            {generatedText}
-          </NeuBox>
-          <NeuBox className="py-4 flex justify-center font-bold" onClick={() => {setGeneratedText(""); setDebugMsg("");}}>
-            <Trash2 size={18} className="mr-2"/> 清除重寫
-          </NeuBox>
-        </div>
-      )}
+      {/* 診斷日誌 */}
+      <div className="mt-8 p-4 bg-black/5 rounded-xl font-mono text-xs h-[150px] overflow-y-auto">
+        {logs.map((log, i) => (
+          <div key={i} className={`mb-1 ${log.includes('✅') ? 'text-green-700 font-bold' : log.includes('❌') ? 'text-red-600' : 'text-gray-500'}`}>
+            {log}
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
