@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Settings, Music, Trash2, StopCircle, Moon, Sun, Monitor, Globe } from 'lucide-react';
+import { Sparkles, Settings, Music, Trash2, StopCircle, Moon, Sun, Monitor, Globe, ChevronDown, ChevronUp, PlayCircle } from 'lucide-react';
 
 // --- UI 元件 ---
 const NeuBox = ({ children, className = '', pressed = false, onClick, isDark }) => {
@@ -25,38 +25,61 @@ const NeuBox = ({ children, className = '', pressed = false, onClick, isDark }) 
   );
 };
 
-// --- 隱形音樂播放器 ---
+// --- iPhone 專用：伸縮式音樂播放器 ---
 const MusicPlayer = ({ keyword, isDark }) => {
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false); // 控制是否展開
 
+  // 當偵測到新歌時，自動展開提醒使用者
   useEffect(() => {
-    if (keyword) setIsPlaying(true);
+    if (keyword) {
+      setIsExpanded(true);
+    }
   }, [keyword]);
 
   if (!keyword) return null;
   
-  // 如果關鍵字包含 "OST"，搜尋詞會調整
   const searchSuffix = keyword.includes("OST") ? " soundtrack audio" : " song audio";
 
   return (
-    <div className="fixed top-4 right-16 z-50 animate-fade-in"> 
-      <NeuBox isDark={isDark} className="p-3 flex items-center gap-3 pr-5" onClick={() => setIsPlaying(!isPlaying)}>
-        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isPlaying ? 'text-purple-500' : 'text-gray-400'}`}>
-          {isPlaying ? <Music className="animate-bounce" size={20}/> : <StopCircle size={20}/>}
+    <div className="fixed top-20 right-6 z-50 animate-fade-in flex flex-col items-end gap-2"> 
+      
+      {/* 1. 控制按鈕 (漂亮的外殼) */}
+      <NeuBox isDark={isDark} className="p-3 flex items-center gap-3 pr-4" onClick={() => setIsExpanded(!isExpanded)}>
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isExpanded ? 'text-purple-500' : 'text-gray-400'}`}>
+          {isExpanded ? <Music className="animate-bounce" size={20}/> : <PlayCircle size={20}/>}
         </div>
         <div className="flex flex-col">
           <span className="text-[10px] opacity-60 font-bold">
-             {keyword.includes("OST") ? "影視劇配樂中" : "偶像歌曲播放中"}
+             {keyword.includes("OST") ? "影視劇配樂" : "偶像歌曲"}
           </span>
-          <span className="text-sm font-black text-purple-500 line-clamp-1 max-w-[150px]">{keyword}</span>
+          <span className="text-sm font-black text-purple-500 line-clamp-1 max-w-[120px]">{keyword}</span>
         </div>
+        {isExpanded ? <ChevronUp size={16} className="opacity-50"/> : <ChevronDown size={16} className="opacity-50"/>}
       </NeuBox>
-      {isPlaying && (
-        <iframe 
-          width="1" height="1" 
-          src={`https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(keyword + searchSuffix)}&autoplay=1&loop=1`}
-          className="absolute opacity-0 pointer-events-none"
-        ></iframe>
+
+      {/* 2. 真實播放器 (展開後顯示) */}
+      {/* 為了讓 iPhone 發出聲音，這個 iframe 必須是可見的，且使用者必須點擊它 */}
+      {isExpanded && (
+        <div className={`
+          overflow-hidden rounded-xl border-4 transition-all duration-500
+          ${isDark ? 'border-[#161722] bg-black' : 'border-[#ffffff] bg-black'}
+        `}
+          style={{ width: '200px', height: '150px' }} // 大小適中，方便點擊
+        >
+          <iframe 
+            width="100%" 
+            height="100%" 
+            src={`https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(keyword + searchSuffix)}&playsinline=1`}
+            title="YouTube Music"
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          ></iframe>
+          {/* 提示語 */}
+          <div className="text-[10px] text-white/50 text-center py-1 bg-black">
+            👆 請點擊上方畫面播放 (iPhone限制)
+          </div>
+        </div>
       )}
     </div>
   );
@@ -106,7 +129,7 @@ const App = () => {
     localStorage.setItem("gemini_key", val);
   };
 
-  // ★★★ 核心邏輯：10000字輸入 + 風格模仿 + BGM偵測 + 聯網 ★★★
+  // 核心邏輯
   const generateStory = async () => {
     if (!apiKey) return alert("請先設定 API Key！");
     if (!note) return alert("請先貼上筆記內容！");
@@ -127,9 +150,8 @@ const App = () => {
          - 如果都沒有，根據氣氛選一個關鍵字。
       
       2. 【風格分析與續寫】：
-         - 分析使用者的文筆（是搞笑、虐心、甜寵、還是意識流？）。
+         - 分析使用者的文筆。
          - 嚴格按照這個風格，續寫 **1500 字以上** 的繁體中文小說。
-         - 劇情要連貫，邏輯要通順，可以加入最新的網路梗或飯圈用語（如果使用者有用的話）。
       
       3. 【重要格式】：
          - 第一行必須是：[MUSIC: 你的音樂關鍵字]
@@ -137,9 +159,7 @@ const App = () => {
     `;
 
     try {
-      // 使用 Gemini 2.5 Flash，並嘗試開啟 Google Search 工具
-      // 注意：如果您的 API Key 是免費版，有時候 Google Search 會被限流，
-      // 但 Gemini 2.5 本身的知識庫已經涵蓋到 2026 年，所以即使搜尋失敗，它依然非常懂！
+      // 強制使用 2.5 Flash
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
         {
@@ -147,7 +167,6 @@ const App = () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             contents: [{ parts: [{ text: promptText }] }],
-            // 嘗試加入 Google Search 工具 (若 API 支援)
             tools: [{ googleSearch: {} }] 
           })
         }
@@ -156,7 +175,6 @@ const App = () => {
       const data = await response.json();
       
       if (!response.ok) {
-        // 如果 2.5 失敗，這裡可以做個簡單的錯誤提示，但通常 2.5 是最穩的
         throw new Error(data.error?.message || "連線錯誤");
       }
 
@@ -172,12 +190,12 @@ const App = () => {
         }
         setGeneratedText(content);
       } else {
-        alert("生成內容為空，可能是被 Google 安全過濾擋住了，請試著調整內容再試試。");
+        alert("AI 未回傳內容，請重試。");
       }
 
     } catch (error) {
       console.error(error);
-      alert(`發生錯誤：${error.message}\n(如果顯示 400 錯誤，可能是您的 API Key 暫時不支援 Search 工具，建議稍後再試)`);
+      alert(`發生錯誤：${error.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -223,13 +241,13 @@ const App = () => {
         </div>
       )}
 
+      {/* 音樂播放器 (現在位於右上角，避免遮擋) */}
       <MusicPlayer keyword={musicKeyword} isDark={isDark} />
 
       {!generatedText && (
         <div className="space-y-6 animate-fade-in">
           <NeuBox isDark={isDark} className="p-6 min-h-[400px]" pressed>
             <textarea 
-              // 這裡不設 maxLength，讓你能貼無限多字
               className={`w-full h-full min-h-[400px] bg-transparent outline-none resize-none text-lg leading-relaxed
                 ${isDark ? 'placeholder-gray-600' : 'placeholder-[#8e91af]'}
               `}
@@ -250,7 +268,7 @@ const App = () => {
       {generatedText && (
         <div className="animate-fade-in space-y-6 pb-20">
           <div className="flex justify-between items-end px-2">
-            <span className="text-xs font-bold text-purple-500">AI 續寫內容 (已模仿文風)</span>
+            <span className="text-xs font-bold text-purple-500">AI 續寫內容</span>
             <span className="text-xs opacity-50">約 {generatedText.length} 字</span>
           </div>
           <NeuBox isDark={isDark} className="p-8 leading-loose text-justify text-lg whitespace-pre-wrap">
