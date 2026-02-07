@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
-import { Sparkles, Settings, Play, Music, Share2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Sparkles, Settings, Play, Music, Trash2 } from 'lucide-react';
 
 // --- UI 組件 ---
 const NeuBox = ({ children, className = '', pressed = false, onClick }) => (
@@ -59,37 +58,46 @@ const App = () => {
     localStorage.setItem("gemini_key", e.target.value);
   };
 
+  // ★★★ 暴力直連核心邏輯 ★★★
   const generateStory = async () => {
     if (!apiKey) return alert("請先設定 API Key！");
     setIsLoading(true);
     setGeneratedText("");
     setMusicKeyword("");
 
+    const promptText = `
+      角色：專業同人小說家。
+      任務：
+      1. 分析使用者筆記：${note}
+      2. 若提到特定歌手/團體，輸出該名字為音樂關鍵字；若為影視劇則輸出 'OST'。
+      3. [重要] 回應格式：第一行必須是 [MUSIC: 關鍵字]，第二行開始才是小說內容。
+      4. 續寫 1500 字以上繁體中文小說，風格需模仿使用者。
+    `;
+
     try {
-      const genAI = new GoogleGenerativeAI(apiKey);
-      
-      // ★★★ 關鍵修正：使用 flash 且不使用 tools (避免權限錯誤) ★★★
-      const model = genAI.getGenerativeModel({ 
-        model: "gemini-1.5-flash",
-        safetySettings: [
-          { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-          { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-          { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-          { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-        ]
-      });
+      // 直接打電話給 Google v1beta 接口 (繞過 SDK)
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{ text: promptText }]
+            }]
+          })
+        }
+      );
 
-      const prompt = `
-        角色：專業同人小說家。
-        任務：
-        1. 分析使用者筆記：${note}
-        2. 若提到特定歌手/團體，輸出該名字為音樂關鍵字；若為影視劇則輸出 'OST'。
-        3. [重要] 回應格式：第一行必須是 [MUSIC: 關鍵字]，第二行開始才是小說內容。
-        4. 續寫 1500 字以上繁體中文小說，風格需模仿使用者。
-      `;
+      const data = await response.json();
 
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
+      if (!response.ok) {
+        throw new Error(data.error?.message || "連線被拒絕");
+      }
+
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "生成失敗，請重試。";
 
       // 解析音樂
       const musicMatch = text.match(/^\[MUSIC:\s*(.*?)\]/);
@@ -102,7 +110,7 @@ const App = () => {
 
     } catch (error) {
       console.error(error);
-      alert("生成失敗：" + error.message + "\n(請確認 API Key 是否正確且有權限)");
+      alert("失敗：" + error.message + "\n(請檢查 API Key 是否複製完整)");
     } finally {
       setIsLoading(false);
     }
@@ -113,7 +121,7 @@ const App = () => {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-black text-purple-600">MemoLive</h1>
-          <p className="text-xs font-bold opacity-50">ULTIMATE EDITION (Flash)</p>
+          <p className="text-xs font-bold opacity-50">ULTIMATE EDITION (Direct)</p>
         </div>
         <NeuBox className="w-12 h-12 flex items-center justify-center" onClick={() => setShowSettings(!showSettings)}>
           <Settings size={20} />
@@ -139,12 +147,12 @@ const App = () => {
           <NeuBox className="p-4 min-h-[300px]" pressed>
             <textarea 
               className="w-full h-full min-h-[300px] bg-transparent outline-none resize-none text-lg leading-relaxed placeholder-gray-400"
-              placeholder="貼上你的筆記... AI 將為你續寫..."
+              placeholder="貼上你的筆記... 這次一定行..."
               value={note} onChange={(e) => setNote(e.target.value)}
             />
           </NeuBox>
           <NeuBox onClick={generateStory} className="py-4 flex justify-center gap-2 font-bold text-purple-600 active:scale-95">
-             {isLoading ? "正在創作中..." : <><Sparkles /> 開始生成 (Flash版)</>}
+             {isLoading ? "連線中..." : <><Sparkles /> 開始生成 (暴力直連版)</>}
           </NeuBox>
         </div>
       )}
@@ -154,7 +162,9 @@ const App = () => {
           <NeuBox className="p-6 leading-loose text-justify text-lg whitespace-pre-wrap">
             {generatedText}
           </NeuBox>
-          <NeuBox className="py-4 flex justify-center font-bold" onClick={() => setGeneratedText("")}>重置</NeuBox>
+          <NeuBox className="py-4 flex justify-center font-bold" onClick={() => setGeneratedText("")}>
+            <Trash2 size={18} className="mr-2"/> 清除重寫
+          </NeuBox>
         </div>
       )}
     </div>
