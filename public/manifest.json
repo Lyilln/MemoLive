@@ -1,11 +1,11 @@
 {
-  "name": "MemoLive Pro",
+  "name": "MemoLive Ultimate",
   "short_name": "MemoLive",
-  "theme_color": "#D0D3EC",
-  "background_color": "#D0D3EC",
+  "start_url": ".",
   "display": "standalone",
-  "scope": "/",
-  "start_url": "/",
+  "background_color": "#D0D3EC",
+  "theme_color": "#D0D3EC",
+  "description": "萬能小說生成器與續寫助手",
   "icons": [
     {
       "src": "pwa-192x192.png",
