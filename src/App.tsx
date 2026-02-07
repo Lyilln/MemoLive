@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Settings, Music, Trash2, StopCircle, Moon, Sun, Monitor, Globe, ChevronDown, ChevronUp, PlayCircle } from 'lucide-react';
+import { Sparkles, Settings, Music, Trash2, StopCircle, Moon, Sun, Monitor, Globe, ChevronDown, ChevronUp, Play, Zap } from 'lucide-react';
 
 // --- UI 元件 ---
 const NeuBox = ({ children, className = '', pressed = false, onClick, isDark }) => {
@@ -25,28 +25,31 @@ const NeuBox = ({ children, className = '', pressed = false, onClick, isDark }) 
   );
 };
 
-// --- iPhone 專用：伸縮式音樂播放器 ---
+// --- iPhone 專用：誘捕式音樂播放器 ---
 const MusicPlayer = ({ keyword, isDark }) => {
-  const [isExpanded, setIsExpanded] = useState(false); // 控制是否展開
+  const [isExpanded, setIsExpanded] = useState(false); 
+  const [userHasClicked, setUserHasClicked] = useState(false); // 新增：紀錄使用者是否點了播放
 
-  // 當偵測到新歌時，自動展開提醒使用者
+  // 當偵測到新歌時，展開盒子，但重置播放狀態 (等待使用者點擊)
   useEffect(() => {
     if (keyword) {
       setIsExpanded(true);
+      setUserHasClicked(false); // 每次換歌都要重新誘捕點擊
     }
   }, [keyword]);
 
   if (!keyword) return null;
   
-  const searchSuffix = keyword.includes("OST") ? " soundtrack audio" : " song audio";
+  // 搜尋字串優化：加上 "official audio" 避免搜到奇怪的 cover
+  const searchSuffix = keyword.includes("OST") ? " soundtrack" : " audio";
 
   return (
-    <div className="fixed top-20 right-6 z-50 animate-fade-in flex flex-col items-end gap-2"> 
+    <div className="fixed top-24 right-6 z-50 animate-fade-in flex flex-col items-end gap-2"> 
       
-      {/* 1. 控制按鈕 (漂亮的外殼) */}
+      {/* 1. 控制條 (顯示歌名) */}
       <NeuBox isDark={isDark} className="p-3 flex items-center gap-3 pr-4" onClick={() => setIsExpanded(!isExpanded)}>
         <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isExpanded ? 'text-purple-500' : 'text-gray-400'}`}>
-          {isExpanded ? <Music className="animate-bounce" size={20}/> : <PlayCircle size={20}/>}
+          {isExpanded ? <Music className="animate-bounce" size={20}/> : <Play size={20}/>}
         </div>
         <div className="flex flex-col">
           <span className="text-[10px] opacity-60 font-bold">
@@ -57,28 +60,40 @@ const MusicPlayer = ({ keyword, isDark }) => {
         {isExpanded ? <ChevronUp size={16} className="opacity-50"/> : <ChevronDown size={16} className="opacity-50"/>}
       </NeuBox>
 
-      {/* 2. 真實播放器 (展開後顯示) */}
-      {/* 為了讓 iPhone 發出聲音，這個 iframe 必須是可見的，且使用者必須點擊它 */}
+      {/* 2. 播放器容器 */}
       {isExpanded && (
         <div className={`
-          overflow-hidden rounded-xl border-4 transition-all duration-500
-          ${isDark ? 'border-[#161722] bg-black' : 'border-[#ffffff] bg-black'}
+          overflow-hidden rounded-xl transition-all duration-500 relative
+          ${isDark ? 'bg-black border border-gray-800' : 'bg-black border-4 border-white'}
         `}
-          style={{ width: '200px', height: '150px' }} // 大小適中，方便點擊
+          style={{ width: '220px', height: '140px' }}
         >
-          <iframe 
-            width="100%" 
-            height="100%" 
-            src={`https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(keyword + searchSuffix)}&playsinline=1`}
-            title="YouTube Music"
-            frameBorder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          ></iframe>
-          {/* 提示語 */}
-          <div className="text-[10px] text-white/50 text-center py-1 bg-black">
-            👆 請點擊上方畫面播放 (iPhone限制)
-          </div>
+          {/* A. 誘捕層 (還沒點擊時顯示這個) */}
+          {!userHasClicked && (
+             <div 
+               className="absolute inset-0 z-10 flex flex-col items-center justify-center cursor-pointer bg-cover bg-center"
+               style={{backgroundImage: 'linear-gradient(45deg, #7c3aed, #db2777)'}} // 紫粉漸層背景
+               onClick={() => setUserHasClicked(true)} // ★ 關鍵：點擊後才載入 iframe
+             >
+               <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg mb-2">
+                 <Play size={24} className="text-purple-600 ml-1" fill="currentColor"/>
+               </div>
+               <span className="text-white text-xs font-bold shadow-black drop-shadow-md">點擊開始播放音樂</span>
+             </div>
+          )}
+
+          {/* B. 真實播放層 (點擊後才載入，利用剛才的點擊事件騙過 iOS) */}
+          {userHasClicked && (
+            <iframe 
+              width="100%" 
+              height="100%" 
+              src={`https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(keyword + searchSuffix)}&autoplay=1&playsinline=1`}
+              title="YouTube Music"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            ></iframe>
+          )}
         </div>
       )}
     </div>
@@ -129,7 +144,6 @@ const App = () => {
     localStorage.setItem("gemini_key", val);
   };
 
-  // 核心邏輯
   const generateStory = async () => {
     if (!apiKey) return alert("請先設定 API Key！");
     if (!note) return alert("請先貼上筆記內容！");
@@ -145,21 +159,21 @@ const App = () => {
       任務：
       1. 【音樂偵測】：
          - 閱讀使用者的筆記：${note}
-         - 如果內容是關於特定「偶像/歌手/團體」(如 BTS, SEVENTEEN, 五月天等)，抓出名字。
-         - 如果內容是關於「影視劇/電影/動漫」，請抓出作品名並加上 "OST"。
-         - 如果都沒有，根據氣氛選一個關鍵字。
+         - 如果內容是關於特定「偶像/歌手/團體」，輸出 [MUSIC: 團體名/人名]。
+         - 如果內容是關於「影視劇/電影」，輸出 [MUSIC: 作品名 OST]。
+         - 若無特定對象，請根據氣氛選一首適合的現有歌曲關鍵字。
       
       2. 【風格分析與續寫】：
-         - 分析使用者的文筆。
-         - 嚴格按照這個風格，續寫 **1500 字以上** 的繁體中文小說。
+         - 分析使用者的文筆，模仿其風格。
+         - 續寫 1500 字以上的繁體中文小說。
       
       3. 【重要格式】：
-         - 第一行必須是：[MUSIC: 你的音樂關鍵字]
+         - 第一行必須是：[MUSIC: 關鍵字]
          - 第二行開始才是小說正文。
     `;
 
     try {
-      // 強制使用 2.5 Flash
+      // 保持使用 2.5 Flash
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
         {
@@ -174,14 +188,10 @@ const App = () => {
 
       const data = await response.json();
       
-      if (!response.ok) {
-        throw new Error(data.error?.message || "連線錯誤");
-      }
+      if (!response.ok) throw new Error(data.error?.message || "連線錯誤");
 
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      
       if (text) {
-        // 解析音樂標籤
         const musicMatch = text.match(/^\[MUSIC:\s*(.*?)\]/);
         let content = text;
         if (musicMatch) {
@@ -190,9 +200,8 @@ const App = () => {
         }
         setGeneratedText(content);
       } else {
-        alert("AI 未回傳內容，請重試。");
+        alert("AI 生成內容為空，請重試。");
       }
-
     } catch (error) {
       console.error(error);
       alert(`發生錯誤：${error.message}`);
@@ -212,7 +221,7 @@ const App = () => {
           <p className="text-xs font-bold opacity-50 tracking-widest flex items-center gap-2">
             ULTIMATE PRO 
             <span className="px-1 py-0.5 rounded bg-blue-500 text-white text-[10px] flex items-center gap-1">
-              <Globe size={10}/> ONLINE
+              <Globe size={10}/> 2.5 ONLINE
             </span>
           </p>
         </div>
@@ -241,7 +250,7 @@ const App = () => {
         </div>
       )}
 
-      {/* 音樂播放器 (現在位於右上角，避免遮擋) */}
+      {/* 音樂播放器 */}
       <MusicPlayer keyword={musicKeyword} isDark={isDark} />
 
       {!generatedText && (
@@ -251,15 +260,15 @@ const App = () => {
               className={`w-full h-full min-h-[400px] bg-transparent outline-none resize-none text-lg leading-relaxed
                 ${isDark ? 'placeholder-gray-600' : 'placeholder-[#8e91af]'}
               `}
-              placeholder="在此貼上你的長篇筆記 (10000字也沒問題)... AI 將模仿你的風格續寫並搜尋資料..."
+              placeholder="在此貼上筆記 (支援萬字輸入)... AI 將為你續寫並搜尋音樂..."
               value={note} onChange={(e) => setNote(e.target.value)}
             />
           </NeuBox>
           <NeuBox isDark={isDark} onClick={generateStory} className="py-4 flex justify-center gap-2 font-bold text-purple-500 text-lg active:scale-95 transition-transform">
              {isLoading ? (
-               <span className="animate-pulse">✨ 正在搜尋資料、分析風格、配樂中...</span>
+               <span className="animate-pulse">✨ AI 正在讀取並選歌中...</span>
              ) : (
-               <><Sparkles /> 開始聯網續寫 (1500字)</>
+               <><Zap /> 開始聯網續寫 (Gemini 2.5)</>
              )}
           </NeuBox>
         </div>
