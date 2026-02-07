@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Settings, Music, Trash2, StopCircle, Moon, Sun, Monitor, Globe, ChevronDown, ChevronUp, Play, Zap } from 'lucide-react';
+import { Sparkles, Settings, Music, Trash2, StopCircle, Moon, Sun, Monitor, Globe, ChevronDown, ChevronUp, Play, Zap, AlertTriangle } from 'lucide-react';
 
 // --- UI 元件 ---
 const NeuBox = ({ children, className = '', pressed = false, onClick, isDark }) => {
@@ -25,28 +25,27 @@ const NeuBox = ({ children, className = '', pressed = false, onClick, isDark }) 
   );
 };
 
-// --- iPhone 專用：穩健型音樂播放器 ---
+// --- 音樂播放器 (誘捕點擊 + 歌詞版防鎖死) ---
 const MusicPlayer = ({ keyword, isDark }) => {
   const [isExpanded, setIsExpanded] = useState(false); 
+  const [userHasClicked, setUserHasClicked] = useState(false);
 
-  // 當偵測到新歌時，自動展開提醒使用者
   useEffect(() => {
     if (keyword) {
       setIsExpanded(true);
+      setUserHasClicked(false);
     }
   }, [keyword]);
 
   if (!keyword) return null;
   
-  // 優化搜尋關鍵字，並強制加上 "video only" 參數避免搜到不可播放的清單
-  // sp=EgIQAQ%253D%253D 是 YouTube 的 "Type: Video" 篩選器編碼
-  const searchSuffix = keyword.includes("OST") ? " soundtrack" : " audio";
-  const searchUrl = `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(keyword + searchSuffix)}&sp=EgIQAQ%253D%253D`;
+  // ★ 強制搜尋歌詞版 (Lyrics)，避開官方 MV 鎖區問題
+  const searchSuffix = keyword.includes("OST") ? " soundtrack lyrics" : " lyrics audio";
 
   return (
     <div className="fixed top-24 right-6 z-50 animate-fade-in flex flex-col items-end gap-2"> 
       
-      {/* 1. 控制條 (顯示歌名) */}
+      {/* 1. 控制條 */}
       <NeuBox isDark={isDark} className="p-3 flex items-center gap-3 pr-4" onClick={() => setIsExpanded(!isExpanded)}>
         <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isExpanded ? 'text-purple-500' : 'text-gray-400'}`}>
           {isExpanded ? <Music className="animate-bounce" size={20}/> : <Play size={20}/>}
@@ -60,7 +59,7 @@ const MusicPlayer = ({ keyword, isDark }) => {
         {isExpanded ? <ChevronUp size={16} className="opacity-50"/> : <ChevronDown size={16} className="opacity-50"/>}
       </NeuBox>
 
-      {/* 2. 播放器容器 (移除自動播放，改為手動點擊以確保相容性) */}
+      {/* 2. 播放器本體 */}
       {isExpanded && (
         <div className={`
           overflow-hidden rounded-xl transition-all duration-500 relative
@@ -68,15 +67,33 @@ const MusicPlayer = ({ keyword, isDark }) => {
         `}
           style={{ width: '220px', height: '140px' }}
         >
-          <iframe 
-            width="100%" 
-            height="100%" 
-            src={searchUrl}
-            title="YouTube Music"
-            frameBorder="0"
-            allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" // 移除 autoplay
-            allowFullScreen
-          ></iframe>
+          {/* A. 誘捕層 (尚未點擊) */}
+          {!userHasClicked && (
+             <div 
+               className="absolute inset-0 z-10 flex flex-col items-center justify-center cursor-pointer bg-cover bg-center"
+               style={{backgroundImage: 'linear-gradient(45deg, #7c3aed, #db2777)'}}
+               onClick={() => setUserHasClicked(true)}
+             >
+               <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg mb-2">
+                 <Play size={24} className="text-purple-600 ml-1" fill="currentColor"/>
+               </div>
+               <span className="text-white text-xs font-bold shadow-black drop-shadow-md">點擊解鎖音樂 (iOS)</span>
+             </div>
+          )}
+
+          {/* B. 真實播放層 (點擊後) */}
+          {userHasClicked && (
+            <iframe 
+              width="100%" 
+              height="100%" 
+              // sp=EgIQAQ%253D%253D 強制過濾為影片
+              src={`https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(keyword + searchSuffix)}&autoplay=1&playsinline=1&sp=EgIQAQ%253D%253D`}
+              title="YouTube Music"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            ></iframe>
+          )}
         </div>
       )}
     </div>
@@ -90,6 +107,7 @@ const App = () => {
   const [apiKey, setApiKey] = useState(localStorage.getItem("gemini_key") || "");
   const [showSettings, setShowSettings] = useState(false);
   const [musicKeyword, setMusicKeyword] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
   
   // 主題設定
   const [themeMode, setThemeMode] = useState(localStorage.getItem("theme_mode") || "system");
@@ -134,22 +152,20 @@ const App = () => {
     setIsLoading(true);
     setGeneratedText("");
     setMusicKeyword("");
+    setErrorMsg("");
 
-    // 針對 Gemini 3 調整的 Prompt
     const promptText = `
       角色：你是「MemoLive」，一位深諳網路飯圈文化、擅長描寫偶像 (K-Pop/C-Pop) 互動與影視劇氛圍的頂級同人小說家。
-      你的風格：文字要有畫面感，情感細膩，該甜的時候甜，該虐的時候虐。
       
       任務：
-      1. 【音樂偵測 (精準版)】：
+      1. 【音樂偵測】：
          - 閱讀筆記：${note}
          - 若提及特定「偶像/歌手」，請抓出最具代表性的歌名或團名。
          - 若為「影視劇」，請抓出作品名並加上 "OST"。
          - 輸出格式為：[MUSIC: 關鍵字]
       
-      2. 【Gemini 3 深度續寫】：
-         - 這是最重要的！請發揮 Gemini 3 的強大創作力。
-         - 分析使用者的文筆，完美模仿其語氣。
+      2. 【深度續寫】：
+         - 使用 Gemini 2.5 的強大理解力，分析並模仿使用者的文筆。
          - 續寫 1500 字以上繁體中文小說，劇情要流暢且吸引人。
       
       3. 【回覆格式】：
@@ -159,16 +175,16 @@ const App = () => {
     `;
 
     try {
-      // ★★★ 核心升級：Gemini 3 Flash Preview ★★★
-      // 注意：根據您的截圖，ID 是 models/gemini-3-flash-preview
+      // ★★★ 核心鎖定：Gemini 2.5 Flash Preview ★★★
+      // 根據你的截圖，我們直接打這個型號！
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             contents: [{ parts: [{ text: promptText }] }],
-            // Gemini 3 支援更強的工具，這裡保持 Google Search
+            // 2.5 支援 Search，我們打開它
             tools: [{ googleSearch: {} }] 
           })
         }
@@ -176,25 +192,49 @@ const App = () => {
 
       const data = await response.json();
       
-      if (!response.ok) throw new Error(data.error?.message || "連線錯誤");
-
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (text) {
-        const musicMatch = text.match(/^\[MUSIC:\s*(.*?)\]/);
-        let content = text;
-        if (musicMatch) {
-          setMusicKeyword(musicMatch[1]);
-          content = text.replace(/^\[MUSIC:\s*.*?\]/, '').trim();
+      if (!response.ok) {
+        // 如果這個指定型號失敗，自動嘗試備用的 2.5 別名
+        if (data.error?.code === 404) {
+           console.log("切換備用型號...");
+           const backupResponse = await fetch(
+             `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+             {
+               method: "POST",
+               headers: { "Content-Type": "application/json" },
+               body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
+             }
+           );
+           const backupData = await backupResponse.json();
+           if(backupResponse.ok) {
+             handleSuccess(backupData);
+             return;
+           }
         }
-        setGeneratedText(content);
-      } else {
-        alert("AI 生成內容為空，可能被過濾或失敗，請重試。");
+        throw new Error(data.error?.message || "連線錯誤");
       }
+
+      handleSuccess(data);
+
     } catch (error) {
       console.error(error);
-      alert(`發生錯誤：${error.message}`);
+      setErrorMsg(`發生錯誤：${error.message}`);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSuccess = (data) => {
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (text) {
+      const musicMatch = text.match(/^\[MUSIC:\s*(.*?)\]/);
+      let content = text;
+      if (musicMatch) {
+        setMusicKeyword(musicMatch[1]);
+        content = text.replace(/^\[MUSIC:\s*.*?\]/, '').trim();
+      }
+      setGeneratedText(content);
+    } else {
+      setErrorMsg("生成內容為空。");
     }
   };
 
@@ -207,9 +247,9 @@ const App = () => {
         <div>
           <h1 className="text-3xl font-black text-purple-600 tracking-tight">MemoLive</h1>
           <p className="text-xs font-bold opacity-50 tracking-widest flex items-center gap-2">
-            ULTIMATE PRO 
-            <span className="px-1 py-0.5 rounded bg-pink-500 text-white text-[10px] flex items-center gap-1">
-              <Zap size={10}/> GEMINI 3.0
+            ULTIMATE 
+            <span className="px-1 py-0.5 rounded bg-blue-500 text-white text-[10px] flex items-center gap-1">
+              <Zap size={10}/> 2.5 FLASH
             </span>
           </p>
         </div>
@@ -248,15 +288,22 @@ const App = () => {
               className={`w-full h-full min-h-[400px] bg-transparent outline-none resize-none text-lg leading-relaxed
                 ${isDark ? 'placeholder-gray-600' : 'placeholder-[#8e91af]'}
               `}
-              placeholder="貼上你的筆記 (支援萬字輸入)... 讓我們看看 Gemini 3 的實力..."
+              placeholder="貼上你的筆記... 我們使用你指定的 Gemini 2.5 Flash，速度快且不易爆額度！"
               value={note} onChange={(e) => setNote(e.target.value)}
             />
           </NeuBox>
+          
+          {errorMsg && (
+            <div className="text-red-500 text-xs font-bold text-center flex items-center justify-center gap-2">
+              <AlertTriangle size={14}/> {errorMsg}
+            </div>
+          )}
+
           <NeuBox isDark={isDark} onClick={generateStory} className="py-4 flex justify-center gap-2 font-bold text-purple-500 text-lg active:scale-95 transition-transform">
              {isLoading ? (
-               <span className="animate-pulse">✨ Gemini 3 正在燃燒運算中...</span>
+               <span className="animate-pulse">✨ Gemini 2.5 正在全速運算...</span>
              ) : (
-               <><Zap /> 啟動 Gemini 3 續寫</>
+               <><Zap /> 開始聯網續寫 (2.5 Flash)</>
              )}
           </NeuBox>
         </div>
@@ -265,7 +312,7 @@ const App = () => {
       {generatedText && (
         <div className="animate-fade-in space-y-6 pb-20">
           <div className="flex justify-between items-end px-2">
-            <span className="text-xs font-bold text-purple-500">GEMINI 3 生成內容</span>
+            <span className="text-xs font-bold text-purple-500">AI 續寫內容</span>
             <span className="text-xs opacity-50">約 {generatedText.length} 字</span>
           </div>
           <NeuBox isDark={isDark} className="p-8 leading-loose text-justify text-lg whitespace-pre-wrap">
