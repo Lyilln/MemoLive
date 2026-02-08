@@ -239,7 +239,7 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
          </button>
        </NeuBox>
        <div className="flex gap-4">
-         <NeuBox isDark={isDark} onClick={gen} className="flex-1 py-4 flex justify-center gap-2 font-bold text-purple-500 text-sm">{loading ? "..." : <><Zap size={18}/> 續寫 (聯網+長文)</>}</NeuBox>
+         <NeuBox isDark={isDark} onClick={gen} className="flex-1 py-4 flex justify-center gap-2 font-bold text-purple-500 text-sm">{loading ? "..." : <><Zap size={18}/> 續寫</>}</NeuBox>
          <NeuBox isDark={isDark} onClick={() => setShowChat(true)} className="flex-1 py-4 flex justify-center gap-2 font-bold text-pink-500 text-sm"><MessageCircle size={18}/> 對話</NeuBox>
        </div>
        <div className="flex flex-col gap-3">
