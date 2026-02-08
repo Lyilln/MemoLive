@@ -20,12 +20,12 @@ export default defineConfig({
         scope: '/MemoLive/',     // 這裡也是
         icons: [
           {
-            src: 'pwa-192x192.png', // ★★★ 修正：拿掉前面的斜線 (變成相對路徑)
+            src: 'pwa-192x192.png.PNG', // ★★★ 修正：拿掉前面的斜線 (變成相對路徑)
             sizes: '192x192',
             type: 'image/png'
           },
           {
-            src: 'pwa-512x512.png', // ★★★ 修正：拿掉前面的斜線
+            src: 'pwa-512x512.png.PNG', // ★★★ 修正：拿掉前面的斜線
             sizes: '512x512',
             type: 'image/png'
           }
