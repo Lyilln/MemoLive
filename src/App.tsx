@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 // ★★★ 確保所有圖示引入完整，絕不白畫面 ★★★
-import { Sparkles, Zap, Edit3, User, List, Package, Plus, X, ChevronLeft, Share2, MoreHorizontal, Send, Copy, Settings, Dice5, Save, LayoutTemplate, Moon, Sun, Globe, MessageCircle, Monitor, Wand2, Eye, Footprints, Smile, PenTool } from 'lucide-react';
+import { Sparkles, Zap, Edit3, User, List, Package, Plus, X, ChevronLeft, Share2, MoreHorizontal, Send, Copy, Settings, Dice5, Save, LayoutTemplate, Moon, Sun, Globe, MessageCircle, Monitor, Wand2, Eye, Footprints, Smile, PenTool, Trash2 } from 'lucide-react';
 
 // --- 1. 更新樣式區塊 ---
 const styles = `
