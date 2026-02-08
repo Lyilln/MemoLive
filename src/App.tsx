@@ -448,6 +448,7 @@ const SplashScreen = ({ onFinish }) => {
 
 // --- App ---
 const App = () => {
+  const [showSplash, setShowSplash] = useState(true); 
   const [activeTab, setActiveTab] = useState("memo");
   const [apiKey, setApiKey] = useState(localStorage.getItem("gemini_key") || "");
   const [themeMode, setThemeMode] = useState(localStorage.getItem("theme_mode") || "system");
@@ -467,6 +468,8 @@ const App = () => {
     return () => mediaQuery.removeEventListener('change', applyTheme);
   }, [themeMode]);
 
+  if (showSplash) return <SplashScreen onFinish={() => setShowSplash(false)} />;
+  
   if (showChat) return <ChatInterface onClose={() => setShowChat(false)} />;
 
   return (
