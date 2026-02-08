@@ -1,18 +1,43 @@
-import React, { useState, useEffect } from 'react';
-import { Sparkles, Moon, Sun, Monitor, Zap, Edit3, User, Play, Pause, SkipBack, SkipForward, Search, List, Table, Key, MessageCircle, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Sparkles, Settings, Music, Trash2, Moon, Sun, Monitor, Zap, Edit3, User, Play, Pause, SkipBack, SkipForward, Search, List, Table, Key, MessageCircle, Link } from 'lucide-react';
 
-// --- 動畫樣式 ---
+// --- 核心 CSS 動畫與樣式 ---
 const styles = `
   @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-  .vinyl-spin { animation: spin 6s linear infinite; }
+  .vinyl-spin { animation: spin 8s linear infinite; }
   .vinyl-spin-paused { animation-play-state: paused; }
-  /* 唱針動畫：中心點調整為唱臂底座 */
-  .tone-arm { transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1); transform-origin: 16px 16px; z-index: 20; }
-  .tone-arm.playing { transform: rotate(35deg); }
-  .tone-arm.paused { transform: rotate(0deg); }
+
+  /* 唱針動畫核心 */
+  .tone-arm-container {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 40px;
+    height: 120px;
+    z-index: 30;
+    pointer-events: none;
+  }
+  .tone-arm {
+    width: 100%;
+    height: 100%;
+    transform-origin: 20px 20px; /* 旋轉軸心設定在基座中心 */
+    transition: transform 1s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .tone-arm.playing { transform: rotate(30deg); } /* 移到唱片上的角度 */
+  .tone-arm.paused { transform: rotate(0deg); } /* 回歸原位 */
+
+  /* 藍色大理石紋路模擬 */
+  .marble-vinyl {
+    background: 
+      radial-gradient(circle at 30% 30%, rgba(255,255,255,0.2) 0%, transparent 10%),
+      radial-gradient(circle at 70% 60%, rgba(255,255,255,0.15) 0%, transparent 10%),
+      repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,0.05) 0, rgba(255,255,255,0.05) 2px, transparent 3px, transparent 8px),
+      linear-gradient(135deg, #4a6fa5 0%, #7a9fca 50%, #4a6fa5 100%);
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.5), 0 10px 20px rgba(0,0,0,0.3);
+  }
 `;
 
-// --- 通用按鈕組件 (NeuBox) ---
+// --- 通用 NeuBox 組件 ---
 const NeuBox = ({ children, className = '', pressed = false, onClick, isDark, active = false }) => {
   const lightShadow = pressed || active ? 'shadow-[inset_2px_2px_5px_#aeb1cb,inset_-2px_-2px_5px_#ffffff] scale-[0.99]' : 'shadow-[5px_5px_10px_#aeb1cb,-5px_-5px_10px_#ffffff] hover:scale-[1.005]';
   const darkShadow = pressed || active ? 'shadow-[inset_2px_2px_5px_#161722,inset_-2px_-2px_5px_#2a2c40] scale-[0.99]' : 'shadow-[5px_5px_10px_#161722,-5px_-5px_10px_#2a2c40] hover:scale-[1.005]';
@@ -23,85 +48,154 @@ const NeuBox = ({ children, className = '', pressed = false, onClick, isDark, ac
   );
 };
 
-// --- 黑膠唱片組件 (1:1 還原你的藍色參考圖) ---
+// ==========================================
+// 🎵 真・藍色大理石黑膠播放器 (1:1 復刻圖二)
+// ==========================================
 const VinylWidget = ({ isDark }) => {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [musicInput, setMusicInput] = useState("");
+  const [urlInput, setUrlInput] = useState("");
   const [videoId, setVideoId] = useState("");
-  const [currentTitle, setCurrentTitle] = useState("未播放");
+  const [status, setStatus] = useState("等待輸入網址...");
+
+  // 從 YouTube 網址提取 Video ID
+  const extractVideoId = (url) => {
+    const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[7].length === 11) ? match[7] : false;
+  };
 
   const handlePlay = () => {
-    const keyword = musicInput || "aespa Drama";
-    setCurrentTitle(keyword);
-    // 加上 sp=EgIQAQ%253D%253D 強制搜尋影片，lyrics 避開鎖區
-    setVideoId(`searchbox?listType=search&list=${encodeURIComponent(keyword + " lyrics audio")}&sp=EgIQAQ%253D%253D`);
-    setIsPlaying(true);
+    if (!urlInput) return alert("請先貼上 YouTube 網址！");
+    const id = extractVideoId(urlInput);
+    if (id) {
+      setVideoId(id);
+      setIsPlaying(true);
+      setStatus("播放中 (若無聲請檢查靜音鍵)");
+    } else {
+      alert("無效的 YouTube 網址！");
+    }
+  };
+
+  const handlePause = () => {
+    setIsPlaying(false);
+    setStatus("已暫停");
   };
 
   return (
-    <div className="w-full relative select-none">
+    <div className="w-full relative select-none my-4">
       <style>{styles}</style>
-      {/* 藍色漸層卡片背景 */}
-      <div className={`relative h-44 w-full rounded-[30px] overflow-hidden flex shadow-xl ${isDark ? 'bg-gradient-to-r from-[#4b5563] to-[#1f2937]' : 'bg-gradient-to-r from-[#93C5FD] to-[#A5B4FC]'}`}>
+      
+      {/* 藍色漸層大卡片背景 */}
+      <div className={`relative h-56 w-full rounded-[32px] overflow-hidden flex shadow-2xl
+        ${isDark ? 'bg-gradient-to-br from-[#4a6fa5] to-[#2c4f7c]' : 'bg-gradient-to-br from-[#8ab6e9] to-[#6a96c9]'}
+      `}>
         
-        {/* 左側：控制區 */}
-        <div className="w-[55%] h-full p-4 flex flex-col justify-between z-10 pl-5">
-           <div className="flex flex-col gap-1">
-             <div className="flex items-center gap-2 border-b border-white/30 pb-1 mb-1 w-full">
-                <Search size={14} className="text-white/70"/>
-                <input type="text" placeholder="輸入歌名..." value={musicInput} onChange={e=>setMusicInput(e.target.value)} className="bg-transparent outline-none text-sm font-bold text-white placeholder-white/50 w-full"/>
+        {/* --- 左側：控制區 (佔 50%) --- */}
+        <div className="w-1/2 h-full p-6 flex flex-col justify-between z-10 relative">
+           
+           {/* 上方：標題與網址輸入 */}
+           <div>
+             <h2 className="text-2xl font-black text-white leading-tight drop-shadow-md mb-1">Youtube Player</h2>
+             <p className="text-sm text-blue-100 font-medium mb-3">{status}</p>
+             
+             <div className="flex items-center gap-2 bg-white/20 rounded-full px-3 py-1.5 backdrop-blur-sm">
+                <Link size={14} className="text-white/70"/>
+                <input 
+                  type="text" 
+                  placeholder="貼上 YouTube 網址..." 
+                  value={urlInput} 
+                  onChange={e=>setUrlInput(e.target.value)} 
+                  className="bg-transparent outline-none text-xs font-bold text-white placeholder-white/50 w-full"
+                />
              </div>
-             <h2 className="text-lg font-black text-white leading-tight line-clamp-2 drop-shadow-md">{currentTitle}</h2>
-             <p className="text-[10px] text-white/80 font-bold tracking-wider">{isPlaying ? "NOW PLAYING" : "PAUSED"}</p>
            </div>
-           <div className="flex items-center gap-3">
-             <SkipBack size={20} className="text-white cursor-pointer active:scale-90" fill="currentColor"/>
-             {isPlaying ? <Pause size={32} onClick={()=>setIsPlaying(false)} className="text-white cursor-pointer active:scale-90 drop-shadow-lg" fill="currentColor"/> : <Play size={32} onClick={handlePlay} className="text-white cursor-pointer active:scale-90 drop-shadow-lg" fill="currentColor"/>}
-             <SkipForward size={20} className="text-white cursor-pointer active:scale-90" fill="currentColor"/>
+
+           {/* 下方：播放按鈕組 (白色大按鈕) */}
+           <div className="flex items-center gap-5">
+             <SkipBack size={28} className="text-white cursor-pointer active:scale-90 transition hover:text-blue-200" fill="currentColor"/>
+             {isPlaying ? (
+                <Pause size={42} onClick={handlePause} className="text-white cursor-pointer active:scale-90 transition drop-shadow-lg hover:text-blue-100" fill="currentColor"/>
+             ) : (
+                <Play size={42} onClick={handlePlay} className="text-white cursor-pointer active:scale-90 transition drop-shadow-lg hover:text-blue-100" fill="currentColor"/>
+             )}
+             <SkipForward size={28} className="text-white cursor-pointer active:scale-90 transition hover:text-blue-200" fill="currentColor"/>
            </div>
         </div>
 
-        {/* 右側：黑膠與唱針 */}
-        <div className="w-[45%] h-full relative flex items-center justify-center">
-           {/* 黑膠本體 */}
-           <div className={`w-32 h-32 rounded-full shadow-2xl flex items-center justify-center border-2 border-white/10 ${isPlaying ? 'vinyl-spin' : 'vinyl-spin-paused'} relative z-0 mr-2`}>
-              <div className="absolute inset-0 rounded-full bg-slate-900" style={{background: 'radial-gradient(circle, #222 0%, #111 100%)'}}></div>
-              <div className="absolute inset-0 rounded-full opacity-30" style={{background: 'repeating-radial-gradient(transparent 0, transparent 2px, #fff 3px)'}}></div>
-              <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-pink-500 to-purple-500 shadow-inner flex items-center justify-center z-10 relative"><div className="w-2 h-2 bg-black rounded-full"></div></div>
+        {/* --- 右側：黑膠與唱針 (佔 50%，超出邊界) --- */}
+        <div className="w-1/2 h-full relative">
+           
+           {/* 唱針 Tone Arm (放在右上角) */}
+           <div className="tone-arm-container">
+             <div className={`tone-arm ${isPlaying ? 'playing' : 'paused'}`}>
+               {/* 基座 */}
+               <div className="absolute top-0 right-0 w-10 h-10 rounded-full bg-[#333] border-[3px] border-[#555] shadow-xl z-20 flex items-center justify-center">
+                 <div className="w-3 h-3 bg-[#777] rounded-full border border-[#222]"></div>
+               </div>
+               {/* 臂桿 */}
+               <div className="absolute top-5 right-4 w-2 h-24 bg-gradient-to-b from-[#999] to-[#444] rounded-full shadow-md z-10 origin-top"></div>
+               {/* 唱頭 */}
+               <div className="absolute bottom-0 right-2 w-6 h-10 bg-[#222] rounded-md shadow-lg border-b-4 border-white/30 z-20 transform rotate-12"></div>
+             </div>
            </div>
-           {/* 唱針 */}
-           <div className={`absolute top-[10px] right-[15px] w-8 h-24 z-20 pointer-events-none tone-arm ${isPlaying ? 'playing' : 'paused'}`}>
-              <div className="absolute top-0 left-0 w-8 h-8 rounded-full bg-[#111] border-2 border-[#444] shadow-xl flex items-center justify-center"><div className="w-3 h-3 bg-[#666] rounded-full"></div></div>
-              <div className="absolute top-4 left-3 w-2 h-16 bg-gradient-to-b from-[#888] to-[#444] rounded-full shadow-lg"></div>
-              <div className="absolute bottom-0 left-2 w-5 h-7 bg-black rounded shadow-md border-b-2 border-white/20"></div>
+
+           {/* 藍色大理石黑膠 (位置調整到右側並超出邊界) */}
+           <div className={`
+              absolute top-1/2 right-[-30px] -translate-y-1/2
+              w-48 h-48 rounded-full border-[8px] border-white/10
+              ${isPlaying ? 'vinyl-spin' : 'vinyl-spin-paused'}
+              marble-vinyl z-0
+           `}>
+              {/* 中心貼紙 */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full bg-gradient-to-tr from-blue-300 to-purple-300 shadow-inner flex items-center justify-center z-10 border-2 border-white/30">
+                 <Music size={24} className="text-white opacity-80"/>
+              </div>
            </div>
         </div>
 
-        {/* 隱藏播放器 */}
-        {isPlaying && videoId && <div className="absolute bottom-0 right-0 w-[1px] h-[1px] opacity-10 pointer-events-none"><iframe width="100%" height="100%" src={`https://www.youtube.com/embed?listType=search&list=${videoId.split("list=")[1]}&autoplay=1&playsinline=1&controls=0`} allow="autoplay; encrypted-media"></iframe></div>}
+        {/* 隱形播放器 (聲音來源) */}
+        {isPlaying && videoId && (
+           <div className="absolute bottom-4 left-20 w-[1px] h-[1px] opacity-10 pointer-events-none overflow-hidden">
+             <iframe 
+               width="100%" height="100%" 
+               // 使用 playsinline 和 autoplay，並關閉控制項
+               src={`https://www.youtube.com/embed/${videoId}?autoplay=1&playsinline=1&controls=0&enablejsapi=1`}
+               allow="autoplay; encrypted-media"
+               title="Audio Engine"
+             ></iframe>
+           </div>
+        )}
       </div>
     </div>
   );
 };
 
-// --- 底部導航 ---
-const Navigation = ({ activeTab, setActiveTab, isDark }) => (
-  <div className={`fixed bottom-0 left-0 w-full z-50 px-6 pb-8 pt-4 backdrop-blur-xl border-t shadow-[0_-5px_20px_rgba(0,0,0,0.1)] ${isDark ? 'bg-[#202130]/90 border-white/5' : 'bg-[#D0D3EC]/90 border-white/20'}`}>
-    <div className="flex justify-around items-center max-w-lg mx-auto">
-      <NavIcon icon={Edit3} label="續寫" active={activeTab === 'memo'} onClick={() => setActiveTab('memo')} />
-      <NavIcon icon={Sparkles} label="生成器" active={activeTab === 'generator'} onClick={() => setActiveTab('generator')} />
-      <NavIcon icon={User} label="我" active={activeTab === 'me'} onClick={() => setActiveTab('me')} />
+// ==========================================
+// 🧭 懸浮導航列 (Floating Pill)
+// ==========================================
+const Navigation = ({ activeTab, setActiveTab, isDark }) => {
+  return (
+    <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 max-w-xs w-full">
+      <div className={`
+        flex justify-evenly items-center px-2 py-3 rounded-full shadow-2xl backdrop-blur-md border
+        ${isDark ? 'bg-[#202130]/90 border-white/10' : 'bg-[#D0D3EC]/95 border-white/40'}
+      `}>
+        <NavIcon icon={Edit3} label="續寫" active={activeTab === 'memo'} onClick={() => setActiveTab('memo')} />
+        <NavIcon icon={Sparkles} label="生成器" active={activeTab === 'generator'} onClick={() => setActiveTab('generator')} />
+        <NavIcon icon={User} label="我" active={activeTab === 'me'} onClick={() => setActiveTab('me')} />
+      </div>
     </div>
-  </div>
-);
+  );
+};
+
 const NavIcon = ({ icon: Icon, label, active, onClick }) => (
-  <div onClick={onClick} className={`flex flex-col items-center gap-1.5 cursor-pointer transition-all duration-200 ${active ? 'scale-105' : 'opacity-40 hover:opacity-70'}`}>
-    <div className={`p-2.5 rounded-2xl transition-colors ${active ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30' : 'bg-transparent text-gray-500'}`}><Icon size={24} strokeWidth={2.5} /></div>
-    <span className={`text-[10px] font-bold ${active ? 'text-purple-500' : 'text-gray-500'}`}>{label}</span>
+  <div onClick={onClick} className={`flex flex-col items-center gap-1 cursor-pointer transition-all duration-300 px-4 ${active ? 'scale-110 -translate-y-1' : 'opacity-50 hover:opacity-80'}`}>
+    <Icon size={22} className={active ? 'text-purple-500' : 'text-gray-600'} strokeWidth={2.5} />
+    <span className={`text-[10px] font-bold ${active ? 'text-purple-500' : 'text-gray-600'}`}>{label}</span>
   </div>
 );
 
-// --- 頁面 1: 續寫 (輸入框巨大化) ---
+// --- 頁面組件 (保持不變，僅確保高度正確) ---
 const PageMemo = ({ isDark, apiKey }) => {
   const [note, setNote] = useState("");
   const [generatedText, setGeneratedText] = useState("");
@@ -119,9 +213,8 @@ const PageMemo = ({ isDark, apiKey }) => {
   return (
     <div className="space-y-4 animate-fade-in pb-32 h-full flex flex-col">
        <div className="flex items-center gap-2 opacity-60 px-1"><Edit3 size={18}/> <h2 className="text-lg font-bold">筆記續寫</h2></div>
-      {/* 這裡設定 h-[40vh] 確保它佔據螢幕 40% 的高度 */}
       <NeuBox isDark={isDark} className="p-4 h-[40vh] flex-shrink-0" pressed>
-        <textarea className={`w-full h-full bg-transparent outline-none resize-none text-base leading-relaxed ${isDark ? 'placeholder-gray-600' : 'placeholder-[#8e91af]'}`} placeholder="貼上你的文章 (輸入框已加大)..." value={note} onChange={(e) => setNote(e.target.value)}/>
+        <textarea className={`w-full h-full bg-transparent outline-none resize-none text-base leading-relaxed ${isDark ? 'placeholder-gray-600' : 'placeholder-[#8e91af]'}`} placeholder="貼上你的文章..." value={note} onChange={(e) => setNote(e.target.value)}/>
       </NeuBox>
       <div className="flex gap-3 flex-shrink-0">
         <NeuBox isDark={isDark} onClick={() => handleGenerate('story')} className="flex-1 py-4 flex justify-center gap-2 font-bold text-purple-500 active:scale-95 text-sm">{isLoading ? <span className="animate-pulse">✨...</span> : <><Zap size={18}/> 續寫</>}</NeuBox>
@@ -137,7 +230,6 @@ const PageMemo = ({ isDark, apiKey }) => {
   );
 };
 
-// --- 頁面 2: 生成器 ---
 const PageGenerator = ({ isDark, apiKey }) => {
   const [config, setConfig] = useState({ genre: "現代言情", tone: "甜寵輕鬆", world: "", character: "", trope: "", other: "" });
   const [fragment, setFragment] = useState("");
@@ -165,7 +257,6 @@ const PageGenerator = ({ isDark, apiKey }) => {
   );
 };
 
-// --- Page: Me ---
 const PageMe = ({ isDark, apiKey, setApiKey, themeMode, toggleTheme }) => {
   const [showInput, setShowInput] = useState(false);
   return (
@@ -180,9 +271,8 @@ const PageMe = ({ isDark, apiKey, setApiKey, themeMode, toggleTheme }) => {
   );
 };
 
-// --- App ---
 const App = () => {
-  const [activeTab, setActiveTab] = useState("memo");
+  const [activeTab, setActiveTab] = useState("me"); // 預設在「我」頁面方便測試音樂
   const [apiKey, setApiKey] = useState(localStorage.getItem("gemini_key") || "");
   const [themeMode, setThemeMode] = useState(localStorage.getItem("theme_mode") || "system");
   const [isDark, setIsDark] = useState(false);
