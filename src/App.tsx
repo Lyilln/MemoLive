@@ -246,30 +246,28 @@ const PageVault = ({ isDark, apiKey }) => {
 
 // --- 頁面: 續寫 (萬字支援 + 擴寫魔杖 + 1500字 + 聯網) ---
 const PageMemo = ({ isDark, apiKey, setShowChat }) => {
-  const [note, setNote] = useState("");
+  // 1. 修改：初始值從 localStorage 讀取 (解決資料遺失)
+  const [note, setNote] = useState(() => localStorage.getItem("memo_draft") || "");
   const [res, setRes] = useState("");
   const [loading, setLoading] = useState(false);
-  const textAreaRef = useRef(null); // 用於抓取選取文字
+  const textAreaRef = useRef(null);
+
+  // 2. 新增：監聽 note 變化，自動存入手機 (解決資料遺失)
+  useEffect(() => {
+    localStorage.setItem("memo_draft", note);
+  }, [note]);
 
   const gen = async () => {
     if (!apiKey) return alert("請設定 API Key");
     if (!note) return alert("內容不能為空");
     setLoading(true);
     try {
-      const prompt = `
-        角色：同人小說家。任務：續寫文章。
-        步驟：
-        1. 分析原文人物性格(OOC禁止)、風格、節奏。
-        2. 若涉及現實偶像/影視，請用 Google 搜尋確認最新資訊(Grounding)。
-        3. 續寫長度需達【1500字以上】。
-        原文：${note}
-      `;
+      const prompt = `角色：同人小說家。任務：續寫文章。步驟：1.分析原文人物性格(OOC禁止)、風格。2.聯網確認偶像/影視資訊。3.續寫長度需達【1500字以上】。原文：${note}`;
       const text = await callGemini(apiKey, prompt, true);
       setRes(text);
     } catch (e) { alert(e.message); } finally { setLoading(false); }
   };
 
-  // 🪄 擴寫魔杖功能 (Sentence Expander)
   const expandSentence = async () => {
     const textarea = textAreaRef.current;
     if (!textarea) return;
@@ -284,11 +282,17 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
     try {
         const prompt = `角色：細膩的文學家。任務：請將這句話擴寫成一段充滿畫面感、微表情、動作與環境描寫的細膩段落（約 50-100 字）。請保持原意，但大幅增加質感。原句：${selectedText}`;
         const expandedText = await callGemini(apiKey, prompt, false);
-        
-        // 將擴寫後的文字插入原位置
         const newText = note.substring(0, start) + expandedText + note.substring(end);
         setNote(newText);
     } catch(e) { alert(e.message); } finally { setLoading(false); }
+  };
+
+  // 3. 新增：一鍵插入功能 (解決操作不便)
+  const insertText = () => {
+    if(!res) return;
+    setNote(prev => prev + "\n\n" + res); // 接在文章最後面 (加兩個換行)
+    setRes(""); // 清空結果框，代表已處理
+    alert("✅ 已插入文章末尾！");
   };
 
   return (
@@ -296,27 +300,33 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
        <div className="flex items-center gap-2 opacity-60 px-2 mt-2"><Edit3 size={20}/> <h2 className="text-xl font-bold">筆記續寫</h2></div>
        <NeuBox isDark={isDark} pressed className="p-5 h-[40vh] relative">
          <textarea 
-            ref={textAreaRef}
-            className="w-full h-full bg-transparent outline-none resize-none text-base leading-relaxed opacity-80 placeholder-opacity-40" 
+            ref={textAreaRef} 
+            className="w-full h-full bg-transparent outline-none resize-none text-base leading-relaxed opacity-80 placeholder-opacity-40 allow-select" 
             placeholder="請貼上你的文章 (支援 50,000 字以上)... 選取文字可使用魔杖擴寫" 
             value={note} 
-            onChange={e=>setNote(e.target.value)}
+            onChange={e=>setNote(e.target.value)} 
             maxLength={50000} 
          />
-         {/* 擴寫魔杖按鈕 */}
-         <button onClick={expandSentence} className="absolute bottom-4 right-4 p-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full shadow-lg text-white active:scale-90 transition-transform flex items-center justify-center" title="✨ 擴寫選取文字">
-            <Wand2 size={20}/>
-         </button>
+         <button onClick={expandSentence} className="absolute bottom-4 right-4 p-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full shadow-lg text-white active:scale-90 transition-transform flex items-center justify-center" title="✨ 擴寫選取文字"><Wand2 size={20}/></button>
        </NeuBox>
        <div className="flex gap-4">
-         <NeuBox isDark={isDark} onClick={gen} className="flex-1 py-4 flex justify-center gap-2 font-bold text-purple-500 text-sm">{loading ? "..." : <><Zap size={18}/> 續寫</>}</NeuBox>
+         <NeuBox isDark={isDark} onClick={gen} className="flex-1 py-4 flex justify-center gap-2 font-bold text-purple-500 text-sm">{loading ? "..." : <><Zap size={18}/> 續寫 (聯網+長文)</>}</NeuBox>
          <NeuBox isDark={isDark} onClick={() => setShowChat(true)} className="flex-1 py-4 flex justify-center gap-2 font-bold text-pink-500 text-sm"><MessageCircle size={18}/> 對話</NeuBox>
        </div>
        <div className="flex flex-col gap-3">
           <div className="flex justify-between px-2 opacity-50"><span className="text-xs font-bold">AI 產出結果 (1500字+)</span>{res && <Copy size={14}/>}</div>
-          <NeuBox isDark={isDark} className="p-6 min-h-[250px] text-sm whitespace-pre-wrap leading-relaxed">
-             {res || <span className="opacity-20 text-xs flex items-center justify-center h-full">等待生成...</span>}
-          </NeuBox>
+          
+          <div className="relative group">
+             <NeuBox isDark={isDark} className="p-6 min-h-[250px] text-sm whitespace-pre-wrap leading-relaxed allow-select">
+                {res || <span className="opacity-20 text-xs flex items-center justify-center h-full">等待生成...</span>}
+             </NeuBox>
+             {/* 4. 按鈕：插入內文 */}
+             {res && (
+                <button onClick={insertText} className="absolute bottom-4 right-4 flex items-center gap-1 bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-lg active:scale-95 transition-transform">
+                   <PenTool size={14}/> 插入內文
+                </button>
+             )}
+          </div>
        </div>
     </div>
   );
