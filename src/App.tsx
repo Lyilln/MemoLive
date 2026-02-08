@@ -1,24 +1,41 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Settings, Music, Trash2, Moon, Sun, Monitor, Zap, Edit3, User, Disc, Play, Pause, Search, Link as LinkIcon, Feather, Map, UserCheck, Key, Eye, MessageCircle, List, Table } from 'lucide-react';
+import { Sparkles, Settings, Music, Trash2, Moon, Sun, Monitor, Zap, Edit3, User, Play, Pause, SkipBack, SkipForward, Search, List, Table, Key, MessageCircle } from 'lucide-react';
 
-// --- CSS for Animations ---
+// --- CSS for Vinyl & Tone Arm ---
 const styles = `
   @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
   }
   .vinyl-spin {
-    animation: spin 4s linear infinite;
+    animation: spin 6s linear infinite;
   }
+  .vinyl-spin-paused {
+    animation-play-state: paused;
+  }
+  
+  /* 唱針動畫 */
   .tone-arm {
-    transition: transform 0.5s ease-in-out;
-    transform-origin: top right;
+    transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform-origin: 12px 12px; /* 旋轉軸心 */
   }
   .tone-arm.playing {
-    transform: rotate(25deg);
+    transform: rotate(35deg); /* 移到唱片上 */
   }
   .tone-arm.paused {
-    transform: rotate(0deg);
+    transform: rotate(0deg); /* 回歸原位 */
+  }
+
+  /* 隱藏但技術上可見的播放器 (iOS 繞過大法) */
+  .ios-hidden-player {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    width: 1px;
+    height: 1px;
+    opacity: 0.01; /* 不能是 0，iOS 會擋 */
+    pointer-events: none;
+    z-index: -1;
   }
 `;
 
@@ -38,7 +55,7 @@ const NeuBox = ({ children, className = '', pressed = false, onClick, isDark, ac
     <div 
       onClick={onClick}
       className={`
-        ${className} transition-all duration-200 ease-out rounded-[20px]
+        ${className} transition-all duration-200 ease-out rounded-[24px]
         ${isDark ? 'bg-[#202130]' : 'bg-[#D0D3EC]'}
         ${active ? activeColor : normalColor}
         ${isDark ? darkShadow : lightShadow}
@@ -51,86 +68,141 @@ const NeuBox = ({ children, className = '', pressed = false, onClick, isDark, ac
 };
 
 // ==========================================
-// 🎵 黑膠唱片機 (修復聲音版)
+// 🎵 真・黑膠唱片機 (還原 Vinyl Widget 介面)
 // ==========================================
-const VinylCard = ({ isDark }) => {
+const VinylWidget = ({ isDark }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [musicInput, setMusicInput] = useState("");
   const [videoId, setVideoId] = useState("");
+  const [currentTitle, setCurrentTitle] = useState("未播放");
+  const [status, setStatus] = useState("等待啟動");
 
   const handlePlay = () => {
-    if (!musicInput) return alert("請輸入歌名！");
-    
-    // 自動加上 lyrics 以避免鎖區，並搜尋 video
-    const query = encodeURIComponent(musicInput + " lyrics audio");
-    // 使用 searchbox 模式，這是最簡單的免 API Key 播放方式
-    // 強制 autoplay=1
+    if (!musicInput) {
+       // 如果沒有輸入，預設播一首 aespa (示範用)
+       setMusicInput("aespa Drama");
+       handleSearchAndPlay("aespa Drama");
+       return;
+    }
+    handleSearchAndPlay(musicInput);
+  };
+
+  const handleSearchAndPlay = (keyword) => {
+    setStatus("載入中...");
+    setCurrentTitle(keyword);
+    // 加上 lyrics audio 關鍵字避開鎖區 MV
+    const query = encodeURIComponent(keyword + " lyrics audio");
+    // 使用 searchbox 模式 + 強制 autoplay
     const id = `searchbox?listType=search&list=${query}`;
-    
     setVideoId(id);
     setIsPlaying(true);
+    setStatus("播放中");
+  };
+
+  const handleToggle = () => {
+    setIsPlaying(!isPlaying);
+    setStatus(isPlaying ? "已暫停" : "播放中");
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full relative">
       <style>{styles}</style>
-      <NeuBox isDark={isDark} className="relative h-40 flex items-center overflow-hidden px-6 gap-6">
-        {/* 左側：旋轉黑膠 */}
-        <div className="relative flex-shrink-0">
-          <div className={`w-28 h-28 rounded-full flex items-center justify-center shadow-md border-4 border-gray-800 bg-black ${isPlaying ? 'vinyl-spin' : ''}`}>
-             <div className="absolute inset-0 rounded-full opacity-30" style={{background: 'repeating-radial-gradient(#333, #333 2px, transparent 3px)'}}></div>
-             <div className={`w-10 h-10 rounded-full ${isDark ? 'bg-purple-900' : 'bg-purple-200'} flex items-center justify-center`}>
-               <Disc size={20} className={isDark ? 'text-purple-300' : 'text-purple-600'}/>
+      
+      {/* 卡片容器：模仿 Vinyl Widget 的寬膠囊造型 */}
+      <NeuBox isDark={isDark} className={`relative h-48 w-full overflow-hidden flex ${isDark ? 'bg-gradient-to-br from-[#2b2d42] to-[#1a1b26]' : 'bg-gradient-to-br from-[#E3E6F5] to-[#C4C7E0]'}`}>
+        
+        {/* 左側：資訊與控制 (佔 50%) */}
+        <div className="w-1/2 p-5 flex flex-col justify-between z-10">
+           {/* 上方：歌名資訊 */}
+           <div>
+             <div className="flex items-center gap-1 opacity-50 mb-1">
+               <Search size={12}/>
+               <input 
+                 type="text" 
+                 placeholder="輸入歌名..." 
+                 value={musicInput} 
+                 onChange={e=>setMusicInput(e.target.value)} 
+                 className="bg-transparent outline-none text-xs font-bold w-full"
+               />
              </div>
-          </div>
-        </div>
-
-        {/* 唱針 */}
-        <div className={`absolute top-4 left-[110px] w-24 h-4 z-10 pointer-events-none tone-arm ${isPlaying ? 'playing' : 'paused'}`}>
-           <div className="w-full h-1 bg-gray-400 rounded-full origin-right shadow-sm rotate-12"></div>
-           <div className="absolute right-0 top-[-4px] w-4 h-4 rounded-full bg-gray-500 shadow-inner"></div>
-           <div className="absolute left-0 top-[-2px] w-3 h-6 bg-gray-600 rounded-sm"></div>
-        </div>
-
-        {/* 右側：控制區 */}
-        <div className="flex-1 flex flex-col justify-center gap-3 z-0 pl-4">
-           <div className={`flex items-center gap-2 border-b ${isDark ? 'border-gray-700' : 'border-gray-300'} pb-1`}>
-             <Search size={14} className="opacity-40"/>
-             <input type="text" placeholder="輸入歌名 (如: aespa Drama)" value={musicInput} onChange={e=>setMusicInput(e.target.value)} className="w-full bg-transparent outline-none text-sm font-bold opacity-80"/>
+             <h2 className={`text-xl font-black leading-tight line-clamp-2 ${isDark ? 'text-white' : 'text-slate-700'}`}>
+               {currentTitle}
+             </h2>
+             <p className={`text-xs font-bold mt-1 ${isDark ? 'text-purple-400' : 'text-purple-600'}`}>
+               {status}
+             </p>
            </div>
+
+           {/* 下方：播放控制鍵 (模仿 Widget 的三顆按鈕) */}
+           <div className="flex items-center gap-4 mt-2">
+             <SkipBack size={24} className="opacity-50 cursor-pointer active:scale-90 transition" fill="currentColor"/>
+             {isPlaying ? (
+                <Pause size={32} onClick={handleToggle} className="cursor-pointer active:scale-90 transition drop-shadow-lg" fill="currentColor"/>
+             ) : (
+                <Play size={32} onClick={handlePlay} className="cursor-pointer active:scale-90 transition drop-shadow-lg" fill="currentColor"/>
+             )}
+             <SkipForward size={24} className="opacity-50 cursor-pointer active:scale-90 transition" fill="currentColor"/>
+           </div>
+        </div>
+
+        {/* 右側：黑膠與唱針 (佔 50%) */}
+        <div className="w-1/2 relative flex items-center justify-center">
            
-           <div className="flex items-center gap-4 mt-1">
-              <button onClick={handlePlay} className={`p-3 rounded-full active:scale-95 ${isDark ? 'bg-purple-600 text-white' : 'bg-purple-500 text-white'} shadow-lg`}>
-                <Play size={18} fill="currentColor" />
-              </button>
-              <button onClick={() => setIsPlaying(false)} className={`p-3 rounded-full active:scale-95 ${isDark ? 'bg-gray-700' : 'bg-white'} shadow`}>
-                <Pause size={18} fill="currentColor" />
-              </button>
-              {/* 這裡放一個極小的 iframe 確保聲音出來 */}
-              {isPlaying && videoId && (
-                <div className="w-1 h-1 overflow-hidden opacity-10 absolute bottom-2 right-2">
-                   <iframe 
-                    width="100%" height="100%" 
-                    src={`https://www.youtube.com/embed?listType=search&list=${videoId.split("list=")[1]}&autoplay=1&playsinline=1`}
-                    allow="autoplay; encrypted-media"
-                    title="Music"
-                  ></iframe>
-                </div>
-              )}
+           {/* 1. 黑膠唱片 (部分超出邊界是特色，但這裡我們先置中) */}
+           {/* 使用 CSS 漸層模擬大理石紋路 */}
+           <div className={`
+              w-40 h-40 rounded-full shadow-2xl flex items-center justify-center border-[6px] 
+              ${isDark ? 'border-[#1a1b26] bg-[#333]' : 'border-[#D0D3EC] bg-[#333]'}
+              ${isPlaying ? 'vinyl-spin' : 'vinyl-spin-paused'}
+           `}>
+              {/* 唱片紋路 */}
+              <div className="absolute inset-0 rounded-full opacity-40" 
+                   style={{background: `repeating-radial-gradient(#111 0, #111 2px, #222 3px, #222 4px)`}}></div>
+              
+              {/* 唱片貼紙 (漸層色) */}
+              <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-blue-400 to-purple-500 shadow-inner flex items-center justify-center z-10">
+                 <Music size={20} className="text-white opacity-80"/>
+              </div>
            </div>
+
+           {/* 2. 唱針 (Tone Arm) - 放在右上角 */}
+           <div className={`absolute top-[-10px] right-[10px] w-8 h-24 z-20 pointer-events-none tone-arm ${isPlaying ? 'playing' : 'paused'}`}>
+              {/* 軸心 */}
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-gray-400 shadow-lg flex items-center justify-center border-2 border-gray-500">
+                <div className="w-2 h-2 bg-black rounded-full"></div>
+              </div>
+              {/* 臂桿 */}
+              <div className="absolute top-6 left-1/2 -translate-x-1/2 w-2 h-16 bg-gradient-to-b from-gray-300 to-gray-400 rounded-full shadow-md"></div>
+              {/* 唱頭 */}
+              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-5 h-7 bg-black rounded shadow-md"></div>
+           </div>
+
         </div>
+
+        {/* 3. 隱形播放器 (iOS 破解關鍵) */}
+        {/* 必須是 opacity > 0 (0.01) 且有尺寸 (1px)，iOS 才不會擋 */}
+        {isPlaying && videoId && (
+          <div className="ios-hidden-player">
+             <iframe 
+               width="100%" height="100%" 
+               src={`https://www.youtube.com/embed?listType=search&list=${videoId.split("list=")[1]}&autoplay=1&playsinline=1&controls=0`}
+               allow="autoplay; encrypted-media"
+               title="Audio Engine"
+             ></iframe>
+          </div>
+        )}
+
       </NeuBox>
-      <p className="text-[10px] opacity-40 text-center mt-2">提示：若無聲音，請確認手機未靜音，或再按一次播放。</p>
     </div>
   );
 };
 
 // ==========================================
-// 🧭 導航列 (回歸經典版)
+// 🧭 導航列 (經典版)
 // ==========================================
 const Navigation = ({ activeTab, setActiveTab, isDark }) => {
   return (
-    <div className={`fixed bottom-0 left-0 w-full z-50 px-4 pb-6 pt-2 backdrop-blur-xl border-t ${isDark ? 'bg-[#202130]/80 border-white/5' : 'bg-[#D0D3EC]/80 border-white/20'}`}>
+    <div className={`fixed bottom-0 left-0 w-full z-50 px-4 pb-6 pt-2 backdrop-blur-xl border-t ${isDark ? 'bg-[#202130]/90 border-white/5' : 'bg-[#D0D3EC]/90 border-white/20'}`}>
       <div className="flex justify-around items-center max-w-md mx-auto">
         <NavIcon icon={Edit3} label="續寫" active={activeTab === 'memo'} onClick={() => setActiveTab('memo')} />
         <NavIcon icon={Sparkles} label="生成器" active={activeTab === 'generator'} onClick={() => setActiveTab('generator')} />
@@ -157,9 +229,8 @@ const PageMemo = ({ isDark, apiKey }) => {
   const [generatedText, setGeneratedText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  // 通用生成函數
   const handleGenerate = async (mode) => {
-    if (!apiKey) return alert("請先設定 API Key！");
+    if (!apiKey) return alert("請先在「我」的頁面設定 API Key！");
     if (!note) return alert("請先輸入內容！");
     setIsLoading(true);
 
@@ -176,7 +247,7 @@ const PageMemo = ({ isDark, apiKey }) => {
         { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] }) }
       );
       const data = await response.json();
-      setGeneratedText(data.candidates?.[0]?.content?.parts?.[0]?.text || "生成失敗，請重試。");
+      setGeneratedText(data.candidates?.[0]?.content?.parts?.[0]?.text || "生成失敗");
     } catch (error) { alert(`錯誤：${error.message}`); } finally { setIsLoading(false); }
   };
 
@@ -184,16 +255,13 @@ const PageMemo = ({ isDark, apiKey }) => {
     <div className="space-y-6 animate-fade-in pb-32">
        <div className="flex items-center gap-2 opacity-60"><Edit3 size={18}/> <h2 className="text-lg font-bold">筆記續寫</h2></div>
       
-      {/* 1. 輸入區 */}
-      <div>
-        <label className="text-xs font-bold opacity-50 mb-2 block pl-2">輸入你的筆記/開頭</label>
-        <NeuBox isDark={isDark} className="p-4 h-[200px]" pressed>
-          <textarea className={`w-full h-full bg-transparent outline-none resize-none text-base leading-relaxed ${isDark ? 'placeholder-gray-600' : 'placeholder-[#8e91af]'}`} 
-            placeholder="在這裡貼上你的文章..." value={note} onChange={(e) => setNote(e.target.value)}/>
-        </NeuBox>
-      </div>
+      {/* 上方：輸入框 */}
+      <NeuBox isDark={isDark} className="p-4 h-[180px]" pressed>
+        <textarea className={`w-full h-full bg-transparent outline-none resize-none text-base leading-relaxed ${isDark ? 'placeholder-gray-600' : 'placeholder-[#8e91af]'}`} 
+          placeholder="在這裡貼上你的文章..." value={note} onChange={(e) => setNote(e.target.value)}/>
+      </NeuBox>
 
-      {/* 2. 操作按鈕區 */}
+      {/* 中間：按鈕 */}
       <div className="flex gap-3">
         <NeuBox isDark={isDark} onClick={() => handleGenerate('story')} className="flex-1 py-3 flex justify-center gap-2 font-bold text-purple-500 active:scale-95">
            {isLoading ? <span className="animate-pulse">✨ 運算中...</span> : <><Zap size={18}/> 開始續寫</>}
@@ -203,7 +271,7 @@ const PageMemo = ({ isDark, apiKey }) => {
         </NeuBox>
       </div>
 
-      {/* 3. 輸出區 (分離) */}
+      {/* 下方：輸出框 */}
       {generatedText && (
         <div className="animate-slide-up">
            <div className="flex justify-between items-center mb-2 px-2">
@@ -227,7 +295,7 @@ const PageGenerator = ({ isDark, apiKey }) => {
   const [fragment, setFragment] = useState("");
   const [sheetInput, setSheetInput] = useState("");
   const [result, setResult] = useState("");
-  const [activeGen, setActiveGen] = useState(null); // 'main', 'fragment', 'sheet'
+  const [activeGen, setActiveGen] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const runGen = async (type, prompt) => {
@@ -243,10 +311,6 @@ const PageGenerator = ({ isDark, apiKey }) => {
       setResult(data.candidates?.[0]?.content?.parts?.[0]?.text || "");
     } catch (e) { alert(e.message); } finally { setIsLoading(false); }
   };
-
-  const genMain = () => runGen('main', `角色：萬能小說生成器。根據設定寫開頭(1200字)：類型${config.genre}, 基調${config.tone}, 世界${config.world}, CP${config.character}, 梗${config.trope}, 要求${config.other}`);
-  const genFragment = () => runGen('fragment', `角色：靈感擴充師。請根據以下碎片設定，進行腦力激盪，聯想出 5 個有趣的劇情發展或設定細節：${fragment}`);
-  const genSheet = () => runGen('sheet', `角色：資深編輯。請根據以下內容，整理出一份詳細的「人設表」或「世界觀設定表」，請用 Markdown 表格格式輸出：${sheetInput}`);
 
   const inputStyle = `w-full bg-transparent outline-none p-2 text-sm border-b ${isDark ? 'border-gray-700 placeholder-gray-600' : 'border-gray-300 placeholder-gray-400'}`;
 
@@ -265,35 +329,35 @@ const PageGenerator = ({ isDark, apiKey }) => {
             <input placeholder="世界觀 (如: ABO, 末世)" value={config.world} onChange={e=>setConfig({...config, world:e.target.value})} className={inputStyle}/>
             <input placeholder="主角 CP (如: 霸總 x 小白兔)" value={config.character} onChange={e=>setConfig({...config, character:e.target.value})} className={inputStyle}/>
             <input placeholder="核心梗 (如: 破鏡重圓)" value={config.trope} onChange={e=>setConfig({...config, trope:e.target.value})} className={inputStyle}/>
-            <NeuBox isDark={isDark} onClick={genMain} className="mt-4 py-3 flex justify-center font-bold text-purple-500 active:scale-95">
+            <NeuBox isDark={isDark} onClick={() => runGen('main', `生成小說開頭：${JSON.stringify(config)}`)} className="mt-4 py-3 flex justify-center font-bold text-purple-500 active:scale-95">
               {isLoading && activeGen==='main' ? "生成中..." : <><Zap size={16} className="mr-1"/> 開始創作</>}
             </NeuBox>
          </NeuBox>
        </section>
 
-       {/* 2. 靈感聯想 (大框框 1) */}
+       {/* 2. 靈感碎片 (大框框 1) */}
        <section>
          <h3 className="text-xs font-bold opacity-50 mb-2 ml-2">靈感碎片擴充</h3>
          <NeuBox isDark={isDark} className="p-4" pressed>
             <textarea className="w-full h-24 bg-transparent outline-none resize-none text-sm" placeholder="丟入一些很碎的設定或想法..." value={fragment} onChange={e=>setFragment(e.target.value)}/>
          </NeuBox>
-         <NeuBox isDark={isDark} onClick={genFragment} className="mt-2 py-3 flex justify-center font-bold text-blue-500 active:scale-95">
+         <NeuBox isDark={isDark} onClick={() => runGen('fragment', `聯想擴充：${fragment}`)} className="mt-2 py-3 flex justify-center font-bold text-blue-500 active:scale-95">
             {isLoading && activeGen==='fragment' ? "聯想中..." : <><List size={16} className="mr-1"/> 幫我聯想設定</>}
          </NeuBox>
        </section>
 
-       {/* 3. 人設表生成 (大框框 2) */}
+       {/* 3. 人設表 (大框框 2) */}
        <section>
          <h3 className="text-xs font-bold opacity-50 mb-2 ml-2">人設/設定表生成器</h3>
          <NeuBox isDark={isDark} className="p-4" pressed>
-            <textarea className="w-full h-24 bg-transparent outline-none resize-none text-sm" placeholder="輸入模糊的想法，幫你整理成表格..." value={sheetInput} onChange={e=>setSheetInput(e.target.value)}/>
+            <textarea className="w-full h-24 bg-transparent outline-none resize-none text-sm" placeholder="輸入模糊的想法，整理成表格..." value={sheetInput} onChange={e=>setSheetInput(e.target.value)}/>
          </NeuBox>
-         <NeuBox isDark={isDark} onClick={genSheet} className="mt-2 py-3 flex justify-center font-bold text-green-500 active:scale-95">
+         <NeuBox isDark={isDark} onClick={() => runGen('sheet', `整理成Markdown設定表：${sheetInput}`)} className="mt-2 py-3 flex justify-center font-bold text-green-500 active:scale-95">
             {isLoading && activeGen==='sheet' ? "整理中..." : <><Table size={16} className="mr-1"/> 生成設定表</>}
          </NeuBox>
        </section>
 
-       {/* 結果顯示 */}
+       {/* 結果彈窗 */}
        {result && (
          <div className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
            <NeuBox isDark={isDark} className="w-full max-w-lg max-h-[80vh] overflow-y-auto p-6 relative shadow-2xl">
@@ -315,7 +379,10 @@ const PageMe = ({ isDark, apiKey, setApiKey, themeMode, toggleTheme }) => {
   return (
     <div className="space-y-8 animate-fade-in pb-32">
        <div className="flex items-center gap-2 opacity-60"><User size={18}/> <h2 className="text-lg font-bold">我的</h2></div>
-       <VinylCard isDark={isDark} />
+       
+       {/* 全新還原版 Vinyl Widget */}
+       <VinylWidget isDark={isDark} />
+
        <div className="space-y-4">
           <NeuBox isDark={isDark} className="p-4 flex justify-between" onClick={toggleTheme}>
             <span className="font-bold text-sm">外觀主題 ({themeMode})</span>
@@ -334,7 +401,7 @@ const PageMe = ({ isDark, apiKey, setApiKey, themeMode, toggleTheme }) => {
 // Main App
 // ==========================================
 const App = () => {
-  const [activeTab, setActiveTab] = useState("memo");
+  const [activeTab, setActiveTab] = useState("me"); // 預設先看「我」頁面的新播放器
   const [apiKey, setApiKey] = useState(localStorage.getItem("gemini_key") || "");
   const [themeMode, setThemeMode] = useState(localStorage.getItem("theme_mode") || "system");
   const [isDark, setIsDark] = useState(false);
