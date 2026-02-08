@@ -69,25 +69,92 @@ const NavIcon = ({ icon: Icon, label, active, onClick, isDark }) => (
 );
 
 // --- 對話介面 ---
-const ChatInterface = ({ onClose }) => (
-  <div className="fixed inset-0 z-[100] bg-[#1a1b23] flex flex-col animate-fade-in">
-    <div className="flex items-center justify-between p-4 pt-12 border-b border-white/5 bg-[#1a1b23]">
-      <button onClick={onClose} className="flex items-center gap-1 text-gray-400 text-sm font-bold active:scale-95"><ChevronLeft size={20}/> 返回</button>
-      <span className="text-white font-bold text-sm tracking-wider">角色實時互動空間</span>
-      <div className="flex gap-3 text-gray-400"><Share2 size={20}/><MoreHorizontal size={20}/></div>
+// --- 修正後的對話介面 (真實串接 AI) ---
+const ChatInterface = ({ onClose }) => {
+  const [messages, setMessages] = useState([{role: 'ai', text: '嗨！我是你的角色靈魂。想聊什麼？'}]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  // 自動捲動到底部
+  const bottomRef = useRef(null);
+  
+  // 讀取 API Key (因為這個組件原本沒有傳進來，我們直接從 localStorage 拿)
+  const apiKey = localStorage.getItem("gemini_key");
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const sendMessage = async () => {
+    if (!input.trim() || !apiKey) return;
+    if (loading) return;
+
+    const userMsg = input;
+    setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
+    setInput("");
+    setLoading(true);
+
+    try {
+      // 這裡呼叫 Gemini
+      const prompt = `角色：你現在扮演使用者小說中的角色。請以角色的口吻與使用者對話。使用者說：${userMsg}`;
+      const reply = await callGemini(apiKey, prompt, false);
+      setMessages(prev => [...prev, { role: 'ai', text: reply }]);
+    } catch (e) {
+      setMessages(prev => [...prev, { role: 'ai', text: "😵 斷線了... (" + e.message + ")" }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-[#1a1b23] flex flex-col animate-fade-in">
+      {/* 頂部導航 */}
+      <div className="flex items-center justify-between p-4 pt-12 border-b border-white/5 bg-[#1a1b23]">
+        <button onClick={onClose} className="flex items-center gap-1 text-gray-400 text-sm font-bold active:scale-95"><ChevronLeft size={20}/> 返回</button>
+        <span className="text-white font-bold text-sm tracking-wider">角色實時互動空間</span>
+        <div className="flex gap-3 text-gray-400"><Share2 size={20}/><MoreHorizontal size={20}/></div>
+      </div>
+
+      {/* 聊天內容區 */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
+         {messages.length === 0 && (
+            <div className="h-full flex flex-col items-center justify-center opacity-30">
+                <MessageCircle size={40} className="mb-2"/>
+                <span className="text-xs">開始第一句對話...</span>
+            </div>
+         )}
+         {messages.map((m, i) => (
+           <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+             <div className={`max-w-[80%] p-3 rounded-2xl text-sm leading-relaxed ${m.role === 'user' ? 'bg-purple-600 text-white rounded-br-none' : 'bg-[#252630] text-gray-200 rounded-bl-none border border-white/5'}`}>
+               {m.text}
+             </div>
+           </div>
+         ))}
+         {loading && <div className="text-xs text-gray-500 animate-pulse ml-2">角色正在輸入...</div>}
+         <div ref={bottomRef} />
+      </div>
+
+      {/* 輸入區 */}
+      <div className="p-4 pb-10 bg-[#1a1b23]">
+         <div className="bg-[#252630] rounded-[20px] p-1.5 pl-5 flex items-center shadow-lg border border-white/5">
+            <input 
+              className="flex-1 bg-transparent outline-none text-white text-sm h-10 placeholder-gray-600" 
+              placeholder="輸入你想說的話..." 
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && sendMessage()}
+            />
+            <button 
+              onClick={sendMessage}
+              disabled={loading}
+              className={`w-10 h-10 rounded-full flex items-center justify-center text-white shadow-lg transition-transform ${loading ? 'bg-gray-600' : 'bg-purple-600 active:scale-90'}`}
+            >
+              <Send size={18} className="ml-0.5"/>
+            </button>
+         </div>
+      </div>
     </div>
-    <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-6">
-       <div className="w-24 h-24 rounded-[24px] bg-[#252630] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] flex items-center justify-center border border-white/5"><MessageCircle size={40} className="text-white/20"/></div>
-       <p className="text-white/30 font-bold tracking-widest text-xs">開始與你的角色進行第一場對話</p>
-    </div>
-    <div className="p-4 pb-10 bg-[#1a1b23]">
-       <div className="bg-[#252630] rounded-[20px] p-1.5 pl-5 flex items-center shadow-lg border border-white/5">
-          <input className="flex-1 bg-transparent outline-none text-white text-sm h-10 placeholder-gray-600" placeholder="輸入你想說的話..." />
-          <button className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center text-white shadow-lg active:scale-90 transition-transform"><Send size={18} className="ml-0.5"/></button>
-       </div>
-    </div>
-  </div>
-);
+  );
+};
 
 // --- API 核心 ---
 const callGemini = async (apiKey, prompt, useWeb = false) => {
