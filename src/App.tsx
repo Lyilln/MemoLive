@@ -158,23 +158,85 @@ const SlotMachine = ({ isDark, apiKey, onResult }) => {
 // --- 頁面: 靈感庫 ---
 const PageVault = ({ isDark, apiKey }) => {
   const [tab, setTab] = useState('snippet'); 
+  // 這裡就是你的「資料庫」，它會讀取手機裡的 memo_vault 存檔
   const [items, setItems] = useState(() => { try { return JSON.parse(localStorage.getItem('memo_vault') || '[]'); } catch { return []; } }); 
-  const [newItemContent, setNewItemContent] = useState(''); const [isAdding, setIsAdding] = useState(false); const [slotResult, setSlotResult] = useState("");
+  const [newItemContent, setNewItemContent] = useState(''); 
+  const [isAdding, setIsAdding] = useState(false); 
+  const [slotResult, setSlotResult] = useState("");
+
+  // 當 items 改變時，自動存入手機資料庫
   useEffect(() => { localStorage.setItem('memo_vault', JSON.stringify(items)); }, [items]); 
-  const addItem = (content = newItemContent, type = tab) => { if (!content.trim()) return; setItems([{ id: Date.now(), type: type, content: content, date: new Date().toLocaleDateString() }, ...items]); setNewItemContent(''); setIsAdding(false); setSlotResult(""); }; 
+  
+  const addItem = (content = newItemContent, type = tab) => { 
+      if (!content.trim()) return; 
+      setItems([{ id: Date.now(), type: type, content: content, date: new Date().toLocaleDateString() }, ...items]); 
+      setNewItemContent(''); 
+      setIsAdding(false); 
+      setSlotResult(""); 
+  }; 
+  
   const filteredItems = items.filter(i => i.type === tab); 
   const TabBtn = ({ id, label, icon: Icon }) => ( <NeuBox isDark={isDark} active={tab === id} onClick={() => setTab(id)} className="flex-1 py-3 flex justify-center items-center gap-2 text-xs font-bold"><Icon size={16}/> {label} </NeuBox> );
 
   return (
-    <div className="space-y-6 animate-fade-in pb-32 h-full flex flex-col">
+    <div className="space-y-4 animate-fade-in pb-32 h-full flex flex-col">
        <div className="flex items-center gap-2 opacity-60 px-2 mt-2"><Package size={20}/> <h2 className="text-xl font-bold">靈感庫</h2></div>
+       
        <SlotMachine isDark={isDark} apiKey={apiKey} onResult={setSlotResult} />
-       {slotResult && ( <div className="animate-fade-in mb-4"><div className="flex justify-between items-center px-2 mb-2 opacity-70"><span className="text-xs font-bold">🎉 拉霸生成結果</span></div><NeuBox isDark={isDark} className="p-5 relative"><div className="text-sm whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto pr-2">{slotResult}</div><div className="flex gap-3 mt-4"><NeuBox isDark={isDark} onClick={() => addItem(slotResult, 'snippet')} className="flex-1 py-2 text-purple-500 text-xs font-bold flex justify-center">存入碎片</NeuBox><NeuBox isDark={isDark} onClick={() => setSlotResult("")} className="px-4 py-2 text-gray-500 text-xs flex justify-center">捨棄</NeuBox></div></NeuBox></div> )}
+       
+       {/* 拉霸結果展示區 */}
+       {slotResult && ( 
+         <div className="animate-fade-in mb-2">
+            <div className="flex justify-between items-center px-2 mb-2 opacity-70"><span className="text-xs font-bold text-purple-400">🎉 生成結果</span></div>
+            <NeuBox isDark={isDark} className="p-4 relative border border-purple-500/30">
+               <div className="text-sm whitespace-pre-wrap leading-relaxed max-h-40 overflow-y-auto pr-2 custom-scrollbar">{slotResult}</div>
+               <div className="flex gap-3 mt-3 pt-3 border-t border-white/5">
+                  <button onClick={() => addItem(slotResult, 'snippet')} className="flex-1 py-2 bg-purple-600 rounded-xl text-white text-xs font-bold shadow-lg active:scale-95">存入碎片</button>
+                  <button onClick={() => setSlotResult("")} className="px-4 py-2 text-gray-500 text-xs font-bold active:scale-95">捨棄</button>
+               </div>
+            </NeuBox>
+         </div> 
+       )}
+
        <div className="flex gap-3 px-1"><TabBtn id="snippet" label="碎片" icon={List} /><TabBtn id="char" label="人設" icon={User} /><TabBtn id="world" label="設定" icon={Sparkles} /></div>
-       {isAdding ? ( <div className="animate-fade-in space-y-3"><NeuBox isDark={isDark} pressed className="p-4"><textarea autoFocus className="w-full h-24 bg-transparent outline-none resize-none text-sm placeholder-opacity-50" placeholder="輸入靈感..." value={newItemContent} onChange={e=>setNewItemContent(e.target.value)}/></NeuBox><div className="flex gap-3"><NeuBox isDark={isDark} onClick={() => addItem()} className="flex-1 py-3 text-purple-500 text-sm font-bold flex justify-center">儲存</NeuBox><NeuBox isDark={isDark} onClick={()=>setIsAdding(false)} className="py-3 px-6 text-gray-500 flex justify-center"><X size={20}/></NeuBox></div></div> ) : ( <NeuBox isDark={isDark} onClick={()=>setIsAdding(true)} className="py-4 flex justify-center items-center gap-2 text-purple-500 opacity-80 text-sm font-bold border-2 border-dashed border-purple-500/20"><Plus size={18}/> 新增項目</NeuBox> )}
-       <div className="flex-grow overflow-y-auto space-y-4 pb-4 px-1 no-scrollbar">
-         {filteredItems.length === 0 && !isAdding && <div className="text-center opacity-30 text-xs mt-10">這裡空空如也...</div>}
-         {filteredItems.map(item => (<NeuBox key={item.id} isDark={isDark} className="p-5 relative group animate-fade-in"><div className="whitespace-pre-wrap text-sm leading-relaxed opacity-90">{item.content}</div><div className="flex justify-between items-center mt-4 opacity-40"><span className="text-[10px] font-bold">{item.date}</span><button onClick={(e)=>{e.stopPropagation(); setItems(items.filter(i=>i.id!==item.id))}} className="p-2 bg-red-500/10 text-red-500 rounded-full active:scale-90"><Trash2 size={14}/></button></div></NeuBox>))}
+       
+       {isAdding ? ( 
+          <div className="animate-fade-in space-y-3 z-10">
+            <NeuBox isDark={isDark} pressed className="p-4 border border-purple-500/50">
+              <textarea autoFocus className="w-full h-24 bg-transparent outline-none resize-none text-sm placeholder-opacity-50" placeholder="輸入靈感..." value={newItemContent} onChange={e=>setNewItemContent(e.target.value)}/>
+            </NeuBox>
+            <div className="flex gap-3">
+              <NeuBox isDark={isDark} onClick={() => addItem()} className="flex-1 py-3 text-purple-500 text-sm font-bold flex justify-center bg-purple-500/10">確認儲存</NeuBox>
+              <NeuBox isDark={isDark} onClick={()=>setIsAdding(false)} className="py-3 px-6 text-gray-500 flex justify-center"><X size={20}/></NeuBox>
+            </div>
+          </div> 
+       ) : ( 
+         <NeuBox isDark={isDark} onClick={()=>setIsAdding(true)} className="py-3 flex justify-center items-center gap-2 text-purple-500 opacity-80 text-sm font-bold border border-dashed border-purple-500/30 active:scale-95"><Plus size={16}/> 新增項目</NeuBox> 
+       )}
+       
+       {/* ★★★ 資料庫大框框 (Storage Box) ★★★ */}
+       {/* 這裡就是你要的「大框框」，我做了凹陷效果，讓它看起來像個資料儲存區 */}
+       <div className={`flex-grow overflow-hidden rounded-[24px] p-1 ${isDark ? 'bg-[#161722]/50 shadow-[inset_2px_2px_6px_#0b0c15,inset_-2px_-2px_6px_#2a2c38]' : 'bg-[#D1D9E6] shadow-[inset_2px_2px_6px_#b8b9be,inset_-2px_-2px_6px_#ffffff]'}`}>
+         <div className="h-full overflow-y-auto p-3 space-y-3 no-scrollbar">
+            {filteredItems.length === 0 && !isAdding && (
+                <div className="h-full flex flex-col items-center justify-center opacity-30 gap-2">
+                    <Package size={40} strokeWidth={1} />
+                    <span className="text-xs">這裡還沒有資料...</span>
+                </div>
+            )}
+            {filteredItems.map(item => (
+              <NeuBox key={item.id} isDark={isDark} className="p-4 relative group animate-fade-in border border-white/5">
+                <div className="whitespace-pre-wrap text-sm leading-relaxed opacity-90">{item.content}</div>
+                <div className="flex justify-between items-center mt-3 pt-3 border-t border-white/5 opacity-50">
+                  <span className="text-[10px] font-bold tracking-wider">{item.date}</span>
+                  {/* 這就是之前導致黑屏的按鈕，現在有了 Trash2 就不會崩潰了 */}
+                  <button onClick={(e)=>{e.stopPropagation(); setItems(items.filter(i=>i.id!==item.id))}} className="p-2 text-red-400 hover:text-red-500 active:scale-90 transition-transform">
+                    <Trash2 size={16}/>
+                  </button>
+                </div>
+              </NeuBox>
+            ))}
+         </div>
        </div>
     </div>
   );
