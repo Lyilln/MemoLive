@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Zap, Edit3, User, List, Package, Plus, X, ChevronLeft, Share2, MoreHorizontal, Send, Copy, Settings, Dice5, Save, LayoutTemplate, Moon, Sun, Globe } from 'lucide-react';
+// ★★★ 關鍵修復：補齊了 Moon, Sun, Globe, LayoutTemplate 等圖示，防止頁面崩潰 ★★★
+import { Sparkles, Zap, Edit3, User, List, Package, Plus, X, ChevronLeft, Share2, MoreHorizontal, Send, Copy, Settings, Dice5, Save, LayoutTemplate, Moon, Sun, Globe, MessageCircle } from 'lucide-react';
 
 // --- CSS 風格 ---
 const styles = `
@@ -73,9 +74,9 @@ const ChatInterface = ({ onClose }) => (
   </div>
 );
 
-// --- API 核心 (含 Google Search & 風格模仿) ---
+// --- API 核心 (支援 Google Search & 風格掃描) ---
 const callGemini = async (apiKey, prompt, useWeb = false) => {
-  // ★★★ 核心升級：若 useWeb 為真，啟用 Google 搜尋工具 ★★★
+  // ★★★ 啟用 Google 搜尋工具，連接網路資訊 ★★★
   const tools = useWeb ? [{ googleSearch: {} }] : [];
   
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, { 
@@ -83,12 +84,19 @@ const callGemini = async (apiKey, prompt, useWeb = false) => {
     headers: { "Content-Type": "application/json" }, 
     body: JSON.stringify({ 
       contents: [{ parts: [{ text: prompt }] }],
-      tools: tools // 注入搜尋工具
+      tools: tools // 注入工具
     }) 
   });
   const data = await response.json();
   if (data.error) throw new Error(data.error.message);
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || "無內容";
+  
+  // 處理聯網回傳的結構 (有時候結構會稍微不同)
+  const candidate = data.candidates?.[0];
+  if (!candidate) return "生成失敗，請重試。";
+  
+  // 優先取用文字內容
+  const textPart = candidate.content?.parts?.find(p => p.text);
+  return textPart ? textPart.text : "生成成功，但內容格式不支援顯示。";
 };
 
 // --- 拉霸機 ---
@@ -125,8 +133,8 @@ const SlotMachine = ({ isDark, apiKey, onResult }) => {
   const generateFromSlots = async (tags) => {
       setLoading(true);
       try {
-          const prompt = `角色：創意小說家。任務：請根據這三個隨機關鍵字 [${tags.join(', ')}]，腦力激盪出一個精彩的小說開頭（至少 500 字）。請確保劇情吸引人，直接開始故事。`;
-          // 拉霸機通常不需要搜尋，純腦洞即可
+          const prompt = `角色：創意小說家。任務：請根據這三個隨機關鍵字 [${tags.join(', ')}]，腦力激盪出一個精彩的小說開頭（至少 500 字）。劇情要新穎，不落俗套。`;
+          // 拉霸機不需要聯網，純腦洞
           const text = await callGemini(apiKey, prompt, false);
           onResult(text);
       } catch(e) { alert("生成失敗: " + e.message); } finally { setLoading(false); }
@@ -161,7 +169,7 @@ const PageVault = ({ isDark, apiKey }) => {
   );
 };
 
-// --- 頁面: 續寫 (重點：萬字支援 & 風格掃描 & 聯網) ---
+// --- 頁面: 續寫 (萬字筆記 + 防OOC + 1500字 + 聯網) ---
 const PageMemo = ({ isDark, apiKey, setShowChat }) => {
   const [note, setNote] = useState("");
   const [res, setRes] = useState("");
@@ -172,19 +180,18 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
     if (!note) return alert("內容不能為空");
     setLoading(true);
     try {
-      // ★★★ 核心 Prompt 升級：兩階段分析 + 風格模仿 + 聯網 ★★★
+      // ★★★ 核心 Prompt：兩階段分析 + 風格模仿 + 聯網 + 1500字 ★★★
       const prompt = `
         角色：你是一位對流行文化、娛樂圈、影視劇如數家珍的頂級同人小說家。
-        
         任務：續寫以下這篇文章。
         
-        【重要規則】
-        1. 掃描與分析：首先請仔細閱讀我提供的文章，分析其中的【人物性格 (OOC 禁止)】、【寫作風格】、【用詞習慣】與【劇情節奏】。
-        2. 聯網檢索：如果文中出現現實存在的偶像、藝人、劇集，請利用你的網路搜尋能力，確認他們的最新動態、真實性格或經典梗，確保內容真實不尷尬。
-        3. 續寫要求：
-           - 嚴格模仿原作者的文風，無縫接軌。
-           - 續寫內容長度必須達到【1500字以上】。
-           - 劇情要有實質推進，拒絕水字數。
+        【重要執行步驟】
+        1. 深度掃描：首先仔細閱讀我提供的文章，提取其中的【人物性格 (OOC 禁止)】、【寫作風格】、【用詞習慣】與【劇情節奏】。
+        2. 聯網檢索 (Grounding)：如果文中出現現實存在的偶像、藝人、劇集或特定文化梗，請務必【使用 Google 搜尋工具】確認他們的最新動態、真實性格、身高外貌或經典梗，確保內容真實不尷尬，沒有事實錯誤。
+        3. 執行續寫：
+           - 嚴格模仿原作者的文風，讓人感覺是同一個人寫的。
+           - 續寫內容長度必須達到【1000~1500字以上】。
+           - 劇情要有實質推進，情節要豐富，拒絕流水帳。
         
         【原文內容】：
         ${note}
@@ -219,7 +226,7 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
   );
 };
 
-// --- 頁面: 生成器 ---
+// --- 頁面: 生成器 (含角色收藏) ---
 const PageGenerator = ({ isDark, apiKey }) => {
   const [config, setConfig] = useState({ genre: "現代言情", tone: "甜寵", world: "", cp: "", trope: "" });
   const [fragment, setFragment] = useState("");
@@ -259,7 +266,7 @@ const PageGenerator = ({ isDark, apiKey }) => {
   );
 };
 
-// --- 頁面: 我 ---
+// --- 頁面: 我 (修復後：不會再白畫面了) ---
 const PageMe = ({ isDark, apiKey, setApiKey, themeMode, toggleTheme }) => {
   const [show, setShow] = useState(false);
   return (
