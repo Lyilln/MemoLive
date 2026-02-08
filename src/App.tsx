@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-// ★★★ 補齊所有圖示，確保功能正常 ★★★
-import { Sparkles, Zap, Edit3, User, List, Package, Plus, X, ChevronLeft, Share2, MoreHorizontal, Send, Copy, Settings, Dice5, Save, LayoutTemplate, Moon, Sun, Globe, MessageCircle, Monitor, Wand2, Eye, Footprints, Smile } from 'lucide-react';
+// ★★★ 確保所有圖示引入完整，絕不白畫面 ★★★
+import { Sparkles, Zap, Edit3, User, List, Package, Plus, X, ChevronLeft, Share2, MoreHorizontal, Send, Copy, Settings, Dice5, Save, LayoutTemplate, Moon, Sun, Globe, MessageCircle, Monitor, Wand2, Eye, Footprints, Smile, PenTool } from 'lucide-react';
 
 // --- CSS 重點：新擬態 (Neumorphism) ---
 const styles = `
@@ -174,25 +174,32 @@ const PageVault = ({ isDark, apiKey }) => {
   );
 };
 
-// --- 頁面: 續寫 (新增：擴寫魔杖) ---
+// --- 頁面: 續寫 (萬字支援 + 擴寫魔杖 + 1500字 + 聯網) ---
 const PageMemo = ({ isDark, apiKey, setShowChat }) => {
   const [note, setNote] = useState("");
   const [res, setRes] = useState("");
   const [loading, setLoading] = useState(false);
-  const textAreaRef = useRef(null);
+  const textAreaRef = useRef(null); // 用於抓取選取文字
 
   const gen = async () => {
     if (!apiKey) return alert("請設定 API Key");
     if (!note) return alert("內容不能為空");
     setLoading(true);
     try {
-      const prompt = `角色：同人小說家。任務：續寫文章。步驟：1.分析人物性格(OOC禁止)、風格。2.聯網確認偶像/影視資訊。3.續寫長度需達【1500字以上】。原文：${note}`;
+      const prompt = `
+        角色：同人小說家。任務：續寫文章。
+        步驟：
+        1. 分析原文人物性格(OOC禁止)、風格、節奏。
+        2. 若涉及現實偶像/影視，請用 Google 搜尋確認最新資訊(Grounding)。
+        3. 續寫長度需達【1500字以上】。
+        原文：${note}
+      `;
       const text = await callGemini(apiKey, prompt, true);
       setRes(text);
     } catch (e) { alert(e.message); } finally { setLoading(false); }
   };
 
-  // 🪄 擴寫魔杖功能
+  // 🪄 擴寫魔杖功能 (Sentence Expander)
   const expandSentence = async () => {
     const textarea = textAreaRef.current;
     if (!textarea) return;
@@ -200,14 +207,15 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
     const end = textarea.selectionEnd;
     const selectedText = note.substring(start, end);
 
-    if (!selectedText || selectedText.trim().length === 0) return alert("請先選取想擴寫的句子！");
-    
+    if (!selectedText || selectedText.trim().length === 0) return alert("請先選取您想要擴寫的句子！");
+    if (!apiKey) return alert("請設定 API Key");
+
     setLoading(true);
     try {
-        const prompt = `角色：細膩的文學家。任務：請將這句話擴寫成一段充滿畫面感、微表情、動作與環境描寫的細膩段落（約 50-100 字），但不要改變原意。原句：${selectedText}`;
+        const prompt = `角色：細膩的文學家。任務：請將這句話擴寫成一段充滿畫面感、微表情、動作與環境描寫的細膩段落（約 50-100 字）。請保持原意，但大幅增加質感。原句：${selectedText}`;
         const expandedText = await callGemini(apiKey, prompt, false);
         
-        // 插入擴寫後的文字
+        // 將擴寫後的文字插入原位置
         const newText = note.substring(0, start) + expandedText + note.substring(end);
         setNote(newText);
     } catch(e) { alert(e.message); } finally { setLoading(false); }
@@ -220,22 +228,20 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
          <textarea 
             ref={textAreaRef}
             className="w-full h-full bg-transparent outline-none resize-none text-base leading-relaxed opacity-80 placeholder-opacity-40" 
-            placeholder="請貼上你的文章 (支援 50,000 字以上)..." 
+            placeholder="請貼上你的文章 (支援 50,000 字以上)... 選取文字可使用魔杖擴寫" 
             value={note} 
             onChange={e=>setNote(e.target.value)}
             maxLength={50000} 
          />
-         {/* 擴寫按鈕 */}
-         <button onClick={expandSentence} className="absolute bottom-4 right-4 p-2 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full shadow-lg text-white active:scale-90 transition-transform" title="擴寫選取的句子">
-            <Wand2 size={18}/>
+         {/* 擴寫魔杖按鈕 */}
+         <button onClick={expandSentence} className="absolute bottom-4 right-4 p-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full shadow-lg text-white active:scale-90 transition-transform flex items-center justify-center" title="✨ 擴寫選取文字">
+            <Wand2 size={20}/>
          </button>
        </NeuBox>
-       
        <div className="flex gap-4">
-         <NeuBox isDark={isDark} onClick={gen} className="flex-1 py-4 flex justify-center gap-2 font-bold text-purple-500 text-sm">{loading ? "..." : <><Zap size={18}/> 續寫 (聯網)</>}</NeuBox>
+         <NeuBox isDark={isDark} onClick={gen} className="flex-1 py-4 flex justify-center gap-2 font-bold text-purple-500 text-sm">{loading ? "..." : <><Zap size={18}/> 續寫 (聯網+長文)</>}</NeuBox>
          <NeuBox isDark={isDark} onClick={() => setShowChat(true)} className="flex-1 py-4 flex justify-center gap-2 font-bold text-pink-500 text-sm"><MessageCircle size={18}/> 對話</NeuBox>
        </div>
-       
        <div className="flex flex-col gap-3">
           <div className="flex justify-between px-2 opacity-50"><span className="text-xs font-bold">AI 產出結果 (1500字+)</span>{res && <Copy size={14}/>}</div>
           <NeuBox isDark={isDark} className="p-6 min-h-[250px] text-sm whitespace-pre-wrap leading-relaxed">
@@ -246,101 +252,145 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
   );
 };
 
-// --- 頁面: 生成器 (新增：五感、過渡、情緒詞庫) ---
+// --- 頁面: 生成器 (包含：靈感生成(舊) + 潤色工具(新)) ---
 const PageGenerator = ({ isDark, apiKey }) => {
-  const [mode, setMode] = useState('main'); // main, sensory, bridge, emotion
-  const [input1, setInput1] = useState("");
-  const [input2, setInput2] = useState("");
-  const [result, setResult] = useState("");
-  const [loading, setLoading] = useState(false);
+  // 分頁狀態：generate (靈感生成) | tools (潤色工具)
+  const [subTab, setSubTab] = useState('generate');
 
-  const run = async (prompt) => {
+  // --- 舊有功能狀態 (保留完整性) ---
+  const [config, setConfig] = useState({ genre: "現代言情", tone: "甜寵", world: "", cp: "", trope: "" });
+  const [fragment, setFragment] = useState("");
+  const [sheetInput, setSheetInput] = useState("");
+  const [resMain, setResMain] = useState("");
+  const [resFrag, setResFrag] = useState("");
+  const [resSheet, setResSheet] = useState("");
+  
+  // --- 新功能狀態 (潤色工具) ---
+  const [toolInput1, setToolInput1] = useState("");
+  const [toolInput2, setToolInput2] = useState("");
+  const [resTool, setResTool] = useState("");
+
+  const [loading, setLoading] = useState("");
+
+  const run = async (id, prompt, setter) => {
     if (!apiKey) return alert("API Key?");
-    setLoading(true);
+    setLoading(id);
     try {
-      const text = await callGemini(apiKey, prompt, true);
-      setResult(text);
-    } catch (e) { alert(e.message); } finally { setLoading(false); }
+      const text = await callGemini(apiKey, prompt, true); // 這裡也開聯網
+      setter(text);
+    } catch (e) { alert(e.message); } finally { setLoading(""); }
   };
 
-  const renderContent = () => {
-      switch(mode) {
-          case 'sensory': // 五感描寫
-              return (
-                  <div className="space-y-4">
-                      <NeuBox isDark={isDark} pressed className="p-5"><input className="w-full bg-transparent outline-none" placeholder="輸入場景 (例如：後台休息室)..." value={input1} onChange={e=>setInput1(e.target.value)}/></NeuBox>
-                      <NeuBox isDark={isDark} onClick={()=>run(`角色：編劇。任務：針對場景「${input1}」，提供五感描寫素材（視覺、聽覺、嗅覺、觸覺、味覺）。`)} className="w-full py-3 flex justify-center text-blue-500 font-bold">{loading?"...":"👁️ 生成五感素材"}</NeuBox>
-                  </div>
-              );
-          case 'bridge': // 過渡橋樑
-              return (
-                  <div className="space-y-4">
-                      <div className="flex gap-2">
-                          <NeuBox isDark={isDark} pressed className="flex-1 p-3"><input className="w-full bg-transparent outline-none text-sm" placeholder="起點 (例：吵架)" value={input1} onChange={e=>setInput1(e.target.value)}/></NeuBox>
-                          <NeuBox isDark={isDark} pressed className="flex-1 p-3"><input className="w-full bg-transparent outline-none text-sm" placeholder="終點 (例：和好)" value={input2} onChange={e=>setInput2(e.target.value)}/></NeuBox>
-                      </div>
-                      <NeuBox isDark={isDark} onClick={()=>run(`角色：小說家。任務：寫一段從「${input1}」過渡到「${input2}」的轉場文字，重點描寫動作、環境與氣氛變化。`)} className="w-full py-3 flex justify-center text-green-500 font-bold">{loading?"...":"🌉 生成轉場"}</NeuBox>
-                  </div>
-              );
-          case 'emotion': // 情緒詞庫
-              const emotions = ["生氣", "高興", "難過", "害怕", "驚訝"];
-              return (
-                  <div className="space-y-4">
-                      <div className="flex gap-2 flex-wrap">
-                          {emotions.map(e => (
-                              <button key={e} onClick={()=>run(`角色：辭典編撰者。任務：列出 10 個形容「${e}」的高級詞彙與成語，特別針對言情/同人小說常用語。`)} className="px-3 py-2 rounded-xl bg-purple-500/10 text-purple-500 text-xs font-bold hover:bg-purple-500 hover:text-white transition-colors">{e}</button>
-                          ))}
-                      </div>
-                      <div className="text-xs opacity-40 text-center">點擊情緒標籤獲取替代詞彙</div>
-                  </div>
-              );
-          default: // 萬能開頭 (預設)
-              return (
-                  <div className="space-y-4">
-                      <NeuBox isDark={isDark} pressed className="p-5"><textarea className="w-full h-24 bg-transparent outline-none resize-none placeholder-opacity-40" placeholder="輸入設定 (世界觀、CP、梗)..." value={input1} onChange={e=>setInput1(e.target.value)}/></NeuBox>
-                      <NeuBox isDark={isDark} onClick={()=>run(`寫一個小說開頭(1500字)：${input1}`)} className="w-full py-3 flex justify-center text-purple-500 font-bold">{loading?"...":"⚡ 創作開頭"}</NeuBox>
-                  </div>
-              );
-      }
+  const saveCharacter = () => {
+      if(!resSheet) return;
+      const vault = JSON.parse(localStorage.getItem('memo_vault') || '[]');
+      const newChar = { id: Date.now(), type: 'char', content: resSheet, date: new Date().toLocaleDateString() };
+      localStorage.setItem('memo_vault', JSON.stringify([newChar, ...vault]));
+      alert("✅ 人設已收藏到靈感庫！");
   };
+
+  const inputClass = "w-full bg-transparent border-b border-white/10 p-2 text-sm outline-none focus:border-purple-500 transition-colors placeholder-opacity-40";
 
   return (
     <div className="space-y-8 animate-fade-in pb-32">
        <div className="flex items-center gap-2 opacity-60 px-2 mt-2"><Sparkles size={20}/> <h2 className="text-xl font-bold">萬能生成中心</h2></div>
        
-       {/* 功能切換 Tabs */}
-       <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
-           {[
-               {id:'main', label:'萬能開頭', icon:Zap},
-               {id:'sensory', label:'五感描寫', icon:Eye},
-               {id:'bridge', label:'過渡橋樑', icon:Footprints},
-               {id:'emotion', label:'情緒詞庫', icon:Smile}
-           ].map(t => (
-               <button key={t.id} onClick={()=>setMode(t.id)} className={`flex items-center gap-1 px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${mode===t.id ? 'bg-purple-500 text-white shadow-lg' : 'bg-gray-500/10 text-gray-500'}`}>
-                   <t.icon size={14}/> {t.label}
-               </button>
-           ))}
+       {/* 頂部切換 Tab：靈感生成 vs 潤色工具 */}
+       <div className="flex gap-4 px-1 mb-2">
+          <NeuBox isDark={isDark} active={subTab === 'generate'} onClick={() => setSubTab('generate')} className="flex-1 py-3 flex justify-center font-bold text-sm">靈感生成</NeuBox>
+          <NeuBox isDark={isDark} active={subTab === 'tools'} onClick={() => setSubTab('tools')} className="flex-1 py-3 flex justify-center font-bold text-sm">潤色工具</NeuBox>
        </div>
 
-       {renderContent()}
+       {/* --- 區塊 1: 靈感生成 (原本的所有功能) --- */}
+       {subTab === 'generate' && (
+         <div className="space-y-8 animate-fade-in">
+            {/* 1. 萬能小說開頭 */}
+            <section className="space-y-3">
+                <span className="text-xs font-bold opacity-50 ml-2">萬能小說開頭</span>
+                <NeuBox isDark={isDark} className="p-6 space-y-5">
+                    <div className="grid grid-cols-2 gap-5">
+                    <input placeholder="類型" value={config.genre} onChange={e=>setConfig({...config, genre:e.target.value})} className={inputClass}/>
+                    <input placeholder="基調" value={config.tone} onChange={e=>setConfig({...config, tone:e.target.value})} className={inputClass}/>
+                    </div>
+                    <input placeholder="世界觀 (如: 娛樂圈)" value={config.world} onChange={e=>setConfig({...config, world:e.target.value})} className={inputClass}/>
+                    <input placeholder="CP (如: 頂流x新人)" value={config.cp} onChange={e=>setConfig({...config, cp:e.target.value})} className={inputClass}/>
+                    <input placeholder="核心梗" value={config.trope} onChange={e=>setConfig({...config, trope:e.target.value})} className={inputClass}/>
+                    <NeuBox isDark={isDark} onClick={()=>run('main', `寫開頭(1500字以上)：${JSON.stringify(config)}`, setResMain)} className="w-full py-3 mt-2 flex justify-center text-purple-500 font-bold">{loading==='main'?"...":"⚡ 創作"}</NeuBox>
+                </NeuBox>
+                <NeuBox isDark={isDark} className="p-6 min-h-[150px] text-sm whitespace-pre-wrap leading-relaxed">{resMain || <span className="opacity-20">結果顯示於此...</span>}</NeuBox>
+            </section>
 
-       <NeuBox isDark={isDark} className="p-6 min-h-[200px] text-sm whitespace-pre-wrap leading-relaxed">
-           {result || <span className="opacity-20 text-xs flex items-center justify-center h-full">等待生成...</span>}
-       </NeuBox>
+            {/* 2. 靈感碎片擴充 */}
+            <section className="space-y-3">
+                <span className="text-xs font-bold opacity-50 ml-2">靈感碎片擴充</span>
+                <NeuBox isDark={isDark} pressed className="p-5"><textarea className="w-full h-20 bg-transparent outline-none text-sm resize-none placeholder-opacity-40" placeholder="輸入碎片..." value={fragment} onChange={e=>setFragment(e.target.value)}/></NeuBox>
+                <NeuBox isDark={isDark} onClick={()=>run('frag', `聯想：${fragment}`, setResFrag)} className="w-full py-3 flex justify-center text-blue-500 font-bold">{loading==='frag'?"...":"≡ 聯想"}</NeuBox>
+                <NeuBox isDark={isDark} className="p-6 min-h-[150px] text-sm whitespace-pre-wrap leading-relaxed">{resFrag || <span className="opacity-20">聯想結果...</span>}</NeuBox>
+            </section>
+
+            {/* 3. 人設表生成 */}
+            <section className="space-y-3">
+                <span className="text-xs font-bold opacity-50 ml-2">人設表生成</span>
+                <NeuBox isDark={isDark} pressed className="p-5"><textarea className="w-full h-20 bg-transparent outline-none text-sm resize-none placeholder-opacity-40" placeholder="輸入特徵..." value={sheetInput} onChange={e=>setSheetInput(e.target.value)}/></NeuBox>
+                <NeuBox isDark={isDark} onClick={()=>run('sheet', `人設表(Markdown)：${sheetInput}`, setResSheet)} className="w-full py-3 flex justify-center text-green-500 font-bold">{loading==='sheet'?"...":"田 生成表格"}</NeuBox>
+                <div className="relative">
+                    <NeuBox isDark={isDark} className="p-6 min-h-[150px] text-sm whitespace-pre-wrap leading-relaxed">{resSheet || <span className="opacity-20">表格結果...</span>}</NeuBox>
+                    {resSheet && (<button onClick={saveCharacter} className="absolute top-4 right-4 flex items-center gap-1 bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-lg active:scale-90 transition-transform"><Save size={14}/> 收藏</button>)}
+                </div>
+            </section>
+         </div>
+       )}
+
+       {/* --- 區塊 2: 潤色工具 (新功能) --- */}
+       {subTab === 'tools' && (
+         <div className="space-y-8 animate-fade-in">
+            
+            {/* 1. 五感描寫生成器 */}
+            <section className="space-y-3">
+                <div className="flex items-center gap-2 ml-2"><Eye size={16} className="text-blue-500"/><span className="text-xs font-bold opacity-70">五感描寫素材</span></div>
+                <NeuBox isDark={isDark} pressed className="p-5"><input className="w-full bg-transparent outline-none" placeholder="輸入場景 (例如：後台休息室)..." value={toolInput1} onChange={e=>setToolInput1(e.target.value)}/></NeuBox>
+                <NeuBox isDark={isDark} onClick={()=>run('tool', `角色：編劇。任務：針對場景「${toolInput1}」，提供五感描寫素材（視覺、聽覺、嗅覺、觸覺、味覺），幫助堆砌細節。`, setResTool)} className="w-full py-3 flex justify-center text-blue-500 font-bold">{loading==='tool'?"...":"👁️ 生成素材"}</NeuBox>
+            </section>
+
+            {/* 2. 過渡橋樑 */}
+            <section className="space-y-3">
+                <div className="flex items-center gap-2 ml-2"><Footprints size={16} className="text-green-500"/><span className="text-xs font-bold opacity-70">劇情過渡橋樑</span></div>
+                <div className="flex gap-3">
+                    <NeuBox isDark={isDark} pressed className="flex-1 p-4"><input className="w-full bg-transparent outline-none text-sm" placeholder="起點 (例：吵架)" value={toolInput1} onChange={e=>setToolInput1(e.target.value)}/></NeuBox>
+                    <NeuBox isDark={isDark} pressed className="flex-1 p-4"><input className="w-full bg-transparent outline-none text-sm" placeholder="終點 (例：和好)" value={toolInput2} onChange={e=>setToolInput2(e.target.value)}/></NeuBox>
+                </div>
+                <NeuBox isDark={isDark} onClick={()=>run('tool', `角色：小說家。任務：寫一段從「${toolInput1}」自然過渡到「${toolInput2}」的轉場文字，重點描寫動作、環境與氣氛變化。`, setResTool)} className="w-full py-3 flex justify-center text-green-500 font-bold">{loading==='tool'?"...":"🌉 生成轉場"}</NeuBox>
+            </section>
+
+            {/* 3. 情緒詞庫 */}
+            <section className="space-y-3">
+                <div className="flex items-center gap-2 ml-2"><Smile size={16} className="text-pink-500"/><span className="text-xs font-bold opacity-70">情緒同義詞庫</span></div>
+                <div className="flex gap-3 flex-wrap">
+                    {["生氣", "高興", "難過", "害怕", "驚訝", "害羞"].map(e => (
+                        <NeuBox key={e} isDark={isDark} onClick={()=>run('tool', `角色：辭典編撰者。任務：列出 10 個形容「${e}」的高級詞彙、成語與微表情描寫，特別針對言情/同人小說常用語。`, setResTool)} className="px-4 py-2 text-xs font-bold text-purple-500 active:scale-95">{e}</NeuBox>
+                    ))}
+                </div>
+                <div className="text-[10px] opacity-40 text-center">點擊標籤獲取高級詞彙</div>
+            </section>
+
+            {/* 工具結果顯示區 */}
+            <div className="space-y-1">
+                <span className="text-xs font-bold opacity-50 ml-2">工具產出結果</span>
+                <NeuBox isDark={isDark} className="p-6 min-h-[200px] text-sm whitespace-pre-wrap leading-relaxed">{resTool || <span className="opacity-20 flex items-center justify-center h-full">等待生成...</span>}</NeuBox>
+            </div>
+         </div>
+       )}
     </div>
   );
 };
 
-// --- 頁面: 我 ---
+// --- 頁面: 我 (修復：淺/深/系統 模式切換) ---
 const PageMe = ({ isDark, apiKey, setApiKey, themeMode, setThemeMode }) => {
   const [show, setShow] = useState(false);
   return (
     <div className="space-y-8 animate-fade-in pb-32">
        <div className="flex items-center gap-2 opacity-60 px-2 mt-2"><User size={20}/> <h2 className="text-xl font-bold">我的</h2></div>
-       <NeuBox isDark={isDark} className="p-8 flex flex-col items-center justify-center gap-3 opacity-60">
-          <LayoutTemplate size={40} />
-          <span className="text-sm font-bold tracking-widest">PRO 創作模式</span>
-       </NeuBox>
+       <NeuBox isDark={isDark} className="p-8 flex flex-col items-center justify-center gap-3 opacity-60"><LayoutTemplate size={40} /><span className="text-sm font-bold tracking-widest">PRO 創作模式</span></NeuBox>
        <div className="space-y-5">
           <div className="space-y-2">
              <span className="text-xs font-bold opacity-50 ml-2">外觀主題</span>
