@@ -69,23 +69,24 @@ const NavIcon = ({ icon: Icon, label, active, onClick, isDark }) => (
 );
 
 // --- 對話介面 ---
-// --- 修正後的對話介面 (真實串接 AI) ---
+// --- 修正後的 ChatInterface (真實串接 AI + 自動捲動) ---
 const ChatInterface = ({ onClose }) => {
-  const [messages, setMessages] = useState([{role: 'ai', text: '嗨！我是你的角色靈魂。想聊什麼？'}]);
+  const [messages, setMessages] = useState([{role: 'ai', text: '（探頭）我是你的角色靈魂... 你想跟我聊什麼劇情？'}]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  // 自動捲動到底部
   const bottomRef = useRef(null);
   
-  // 讀取 API Key (因為這個組件原本沒有傳進來，我們直接從 localStorage 拿)
+  // 直接從 localStorage 拿 API Key，確保獨立運作
   const apiKey = localStorage.getItem("gemini_key");
 
+  // 有新訊息時自動捲動到底部
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   const sendMessage = async () => {
-    if (!input.trim() || !apiKey) return;
+    if (!input.trim()) return;
+    if (!apiKey) return alert("請先去「我」的頁面設定 API Key 喔！");
     if (loading) return;
 
     const userMsg = input;
@@ -94,16 +95,64 @@ const ChatInterface = ({ onClose }) => {
     setLoading(true);
 
     try {
-      // 這裡呼叫 Gemini
-      const prompt = `角色：你現在扮演使用者小說中的角色。請以角色的口吻與使用者對話。使用者說：${userMsg}`;
+      // 設定 AI 角色扮演的 Prompt
+      const prompt = `System: 你現在是使用者筆下小說中的角色。請完全進入角色，用該角色的口吻、語氣、性格與作者（使用者）對話。不要跳出角色。
+      
+      User: ${userMsg}`;
+      
       const reply = await callGemini(apiKey, prompt, false);
       setMessages(prev => [...prev, { role: 'ai', text: reply }]);
     } catch (e) {
-      setMessages(prev => [...prev, { role: 'ai', text: "😵 斷線了... (" + e.message + ")" }]);
+      setMessages(prev => [...prev, { role: 'ai', text: "😵 訊號中斷... (" + e.message + ")" }]);
     } finally {
       setLoading(false);
     }
   };
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-[#1a1b23] flex flex-col animate-fade-in">
+      {/* 頂部導航 */}
+      <div className="flex items-center justify-between p-4 pt-12 border-b border-white/5 bg-[#1a1b23]">
+        <button onClick={onClose} className="flex items-center gap-1 text-gray-400 text-sm font-bold active:scale-95"><ChevronLeft size={20}/> 返回</button>
+        <span className="text-white font-bold text-sm tracking-wider">角色實時互動空間</span>
+        <div className="flex gap-3 text-gray-400"><Share2 size={20}/><MoreHorizontal size={20}/></div>
+      </div>
+
+      {/* 聊天內容區 */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
+         {messages.map((m, i) => (
+           <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+             <div className={`max-w-[85%] p-3 rounded-2xl text-sm leading-relaxed allow-select ${m.role === 'user' ? 'bg-purple-600 text-white rounded-br-none' : 'bg-[#252630] text-gray-200 rounded-bl-none border border-white/5'}`}>
+               {m.text}
+             </div>
+           </div>
+         ))}
+         {loading && <div className="text-xs text-gray-500 animate-pulse ml-2">角色正在輸入...</div>}
+         <div ref={bottomRef} />
+      </div>
+
+      {/* 輸入區 */}
+      <div className="p-4 pb-10 bg-[#1a1b23]">
+         <div className="bg-[#252630] rounded-[20px] p-1.5 pl-5 flex items-center shadow-lg border border-white/5">
+            <input 
+              className="flex-1 bg-transparent outline-none text-white text-sm h-10 placeholder-gray-600" 
+              placeholder="輸入你想說的話..." 
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && sendMessage()}
+            />
+            <button 
+              onClick={sendMessage}
+              disabled={loading}
+              className={`w-10 h-10 rounded-full flex items-center justify-center text-white shadow-lg transition-transform ${loading ? 'bg-gray-600' : 'bg-purple-600 active:scale-90'}`}
+            >
+              <Send size={18} className="ml-0.5"/>
+            </button>
+         </div>
+      </div>
+    </div>
+  );
+};
 
   return (
     <div className="fixed inset-0 z-[100] bg-[#1a1b23] flex flex-col animate-fade-in">
