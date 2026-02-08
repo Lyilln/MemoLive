@@ -7,7 +7,6 @@ const styles = `
   @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
   .animate-fade-in { animation: fade-in 0.5s ease-out forwards; }
   
-  /* ★★★ 新增：呼吸燈與淡出動畫 ★★★ */
   @keyframes pulse-glow { 0%, 100% { opacity: 1; transform: scale(1); filter: drop-shadow(0 0 10px rgba(168,85,247,0.4)); } 50% { opacity: 0.7; transform: scale(0.95); filter: drop-shadow(0 0 20px rgba(168,85,247,0.8)); } }
   .animate-pulse-glow { animation: pulse-glow 2s infinite ease-in-out; }
 
@@ -16,6 +15,9 @@ const styles = `
 
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* ★★★ 新增：允許選取文字的樣式 ★★★ */
+  .allow-select { user-select: text; -webkit-user-select: text; }
 `;
 
 // --- 核心元件：新擬態盒子 (NeuBox) ---
@@ -322,129 +324,123 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
 
 // --- 頁面: 生成器 (包含：靈感生成(舊) + 潤色工具(新)) ---
 const PageGenerator = ({ isDark, apiKey }) => {
-  // 分頁狀態：generate (靈感生成) | tools (潤色工具)
   const [subTab, setSubTab] = useState('generate');
-
-  // --- 舊有功能狀態 (保留完整性) ---
   const [config, setConfig] = useState({ genre: "現代言情", tone: "甜寵", world: "", cp: "", trope: "" });
   const [fragment, setFragment] = useState("");
   const [sheetInput, setSheetInput] = useState("");
+  
+  // 結果狀態
   const [resMain, setResMain] = useState("");
   const [resFrag, setResFrag] = useState("");
   const [resSheet, setResSheet] = useState("");
+  const [resTool, setResTool] = useState("");
   
-  // --- 新功能狀態 (潤色工具) ---
+  // 工具輸入
   const [toolInput1, setToolInput1] = useState("");
   const [toolInput2, setToolInput2] = useState("");
-  const [resTool, setResTool] = useState("");
-
+  
   const [loading, setLoading] = useState("");
 
   const run = async (id, prompt, setter) => {
     if (!apiKey) return alert("API Key?");
     setLoading(id);
     try {
-      const text = await callGemini(apiKey, prompt, true); // 這裡也開聯網
+      const text = await callGemini(apiKey, prompt, true);
       setter(text);
     } catch (e) { alert(e.message); } finally { setLoading(""); }
   };
 
-  const saveCharacter = () => {
-      if(!resSheet) return;
+  // ★★★ 通用儲存功能：把任何文字存入靈感庫 ★★★
+  const saveToVault = (content, type = 'snippet') => {
+      if(!content) return;
       const vault = JSON.parse(localStorage.getItem('memo_vault') || '[]');
-      const newChar = { id: Date.now(), type: 'char', content: resSheet, date: new Date().toLocaleDateString() };
-      localStorage.setItem('memo_vault', JSON.stringify([newChar, ...vault]));
-      alert("✅ 人設已收藏到靈感庫！");
+      // 這裡 type 預設存為 'snippet' (碎片)，人設表則存為 'char' (人設)
+      const newItem = { id: Date.now(), type: type, content: content, date: new Date().toLocaleDateString() };
+      localStorage.setItem('memo_vault', JSON.stringify([newItem, ...vault]));
+      alert("✅ 已存入靈感庫！");
+  };
+
+  // ★★★ 通用複製功能 ★★★
+  const copyText = (text) => {
+      if(!text) return;
+      navigator.clipboard.writeText(text).then(() => alert("📋 已複製到剪貼簿"));
   };
 
   const inputClass = "w-full bg-transparent border-b border-white/10 p-2 text-sm outline-none focus:border-purple-500 transition-colors placeholder-opacity-40";
 
+  // 結果顯示框組件 (包含：可選取文字、儲存按鈕、複製按鈕)
+  const ResultBox = ({ text, type = 'snippet', placeholder = "結果顯示於此..." }) => (
+    <div className="relative group">
+        <NeuBox isDark={isDark} className="p-6 min-h-[150px] text-sm whitespace-pre-wrap leading-relaxed allow-select">
+            {text || <span className="opacity-20 flex items-center justify-center h-full select-none">{placeholder}</span>}
+        </NeuBox>
+        {text && (
+            <div className="flex gap-2 mt-2 justify-end">
+                <button onClick={() => copyText(text)} className="flex items-center gap-1 bg-gray-500/20 px-3 py-1.5 rounded-lg text-xs font-bold active:scale-95 transition-transform"><Copy size={14}/> 複製</button>
+                <button onClick={() => saveToVault(text, type)} className="flex items-center gap-1 bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-lg active:scale-95 transition-transform"><Save size={14}/> 存入靈感庫</button>
+            </div>
+        )}
+    </div>
+  );
+
   return (
     <div className="space-y-8 animate-fade-in pb-32">
        <div className="flex items-center gap-2 opacity-60 px-2 mt-2"><Sparkles size={20}/> <h2 className="text-xl font-bold">萬能生成中心</h2></div>
-       
-       {/* 頂部切換 Tab：靈感生成 vs 潤色工具 */}
        <div className="flex gap-4 px-1 mb-2">
           <NeuBox isDark={isDark} active={subTab === 'generate'} onClick={() => setSubTab('generate')} className="flex-1 py-3 flex justify-center font-bold text-sm">靈感生成</NeuBox>
           <NeuBox isDark={isDark} active={subTab === 'tools'} onClick={() => setSubTab('tools')} className="flex-1 py-3 flex justify-center font-bold text-sm">潤色工具</NeuBox>
        </div>
 
-       {/* --- 區塊 1: 靈感生成 (原本的所有功能) --- */}
        {subTab === 'generate' && (
          <div className="space-y-8 animate-fade-in">
-            {/* 1. 萬能小說開頭 */}
             <section className="space-y-3">
                 <span className="text-xs font-bold opacity-50 ml-2">萬能小說開頭</span>
                 <NeuBox isDark={isDark} className="p-6 space-y-5">
-                    <div className="grid grid-cols-2 gap-5">
-                    <input placeholder="類型" value={config.genre} onChange={e=>setConfig({...config, genre:e.target.value})} className={inputClass}/>
-                    <input placeholder="基調" value={config.tone} onChange={e=>setConfig({...config, tone:e.target.value})} className={inputClass}/>
-                    </div>
-                    <input placeholder="世界觀 (如: 娛樂圈)" value={config.world} onChange={e=>setConfig({...config, world:e.target.value})} className={inputClass}/>
-                    <input placeholder="CP (如: 頂流x新人)" value={config.cp} onChange={e=>setConfig({...config, cp:e.target.value})} className={inputClass}/>
+                    <div className="grid grid-cols-2 gap-5"><input placeholder="類型" value={config.genre} onChange={e=>setConfig({...config, genre:e.target.value})} className={inputClass}/><input placeholder="基調" value={config.tone} onChange={e=>setConfig({...config, tone:e.target.value})} className={inputClass}/></div>
+                    <input placeholder="世界觀" value={config.world} onChange={e=>setConfig({...config, world:e.target.value})} className={inputClass}/>
+                    <input placeholder="CP" value={config.cp} onChange={e=>setConfig({...config, cp:e.target.value})} className={inputClass}/>
                     <input placeholder="核心梗" value={config.trope} onChange={e=>setConfig({...config, trope:e.target.value})} className={inputClass}/>
                     <NeuBox isDark={isDark} onClick={()=>run('main', `寫開頭(1500字以上)：${JSON.stringify(config)}`, setResMain)} className="w-full py-3 mt-2 flex justify-center text-purple-500 font-bold">{loading==='main'?"...":"⚡ 創作"}</NeuBox>
                 </NeuBox>
-                <NeuBox isDark={isDark} className="p-6 min-h-[150px] text-sm whitespace-pre-wrap leading-relaxed">{resMain || <span className="opacity-20">結果顯示於此...</span>}</NeuBox>
+                <ResultBox text={resMain} type="snippet" />
             </section>
-
-            {/* 2. 靈感碎片擴充 */}
+            
             <section className="space-y-3">
                 <span className="text-xs font-bold opacity-50 ml-2">靈感碎片擴充</span>
                 <NeuBox isDark={isDark} pressed className="p-5"><textarea className="w-full h-20 bg-transparent outline-none text-sm resize-none placeholder-opacity-40" placeholder="輸入碎片..." value={fragment} onChange={e=>setFragment(e.target.value)}/></NeuBox>
                 <NeuBox isDark={isDark} onClick={()=>run('frag', `聯想：${fragment}`, setResFrag)} className="w-full py-3 flex justify-center text-blue-500 font-bold">{loading==='frag'?"...":"≡ 聯想"}</NeuBox>
-                <NeuBox isDark={isDark} className="p-6 min-h-[150px] text-sm whitespace-pre-wrap leading-relaxed">{resFrag || <span className="opacity-20">聯想結果...</span>}</NeuBox>
+                <ResultBox text={resFrag} type="snippet" />
             </section>
 
-            {/* 3. 人設表生成 */}
             <section className="space-y-3">
                 <span className="text-xs font-bold opacity-50 ml-2">人設表生成</span>
                 <NeuBox isDark={isDark} pressed className="p-5"><textarea className="w-full h-20 bg-transparent outline-none text-sm resize-none placeholder-opacity-40" placeholder="輸入特徵..." value={sheetInput} onChange={e=>setSheetInput(e.target.value)}/></NeuBox>
                 <NeuBox isDark={isDark} onClick={()=>run('sheet', `人設表(Markdown)：${sheetInput}`, setResSheet)} className="w-full py-3 flex justify-center text-green-500 font-bold">{loading==='sheet'?"...":"田 生成表格"}</NeuBox>
-                <div className="relative">
-                    <NeuBox isDark={isDark} className="p-6 min-h-[150px] text-sm whitespace-pre-wrap leading-relaxed">{resSheet || <span className="opacity-20">表格結果...</span>}</NeuBox>
-                    {resSheet && (<button onClick={saveCharacter} className="absolute top-4 right-4 flex items-center gap-1 bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-lg active:scale-90 transition-transform"><Save size={14}/> 收藏</button>)}
-                </div>
+                <ResultBox text={resSheet} type="char" placeholder="表格結果..." />
             </section>
          </div>
        )}
 
-       {/* --- 區塊 2: 潤色工具 (新功能) --- */}
        {subTab === 'tools' && (
          <div className="space-y-8 animate-fade-in">
-            
-            {/* 1. 五感描寫生成器 */}
             <section className="space-y-3">
                 <div className="flex items-center gap-2 ml-2"><Eye size={16} className="text-blue-500"/><span className="text-xs font-bold opacity-70">五感描寫素材</span></div>
-                <NeuBox isDark={isDark} pressed className="p-5"><input className="w-full bg-transparent outline-none" placeholder="輸入場景 (例如：後台休息室)..." value={toolInput1} onChange={e=>setToolInput1(e.target.value)}/></NeuBox>
-                <NeuBox isDark={isDark} onClick={()=>run('tool', `角色：編劇。任務：針對場景「${toolInput1}」，提供五感描寫素材（視覺、聽覺、嗅覺、觸覺、味覺），幫助堆砌細節。`, setResTool)} className="w-full py-3 flex justify-center text-blue-500 font-bold">{loading==='tool'?"...":"👁️ 生成素材"}</NeuBox>
+                <NeuBox isDark={isDark} pressed className="p-5"><input className="w-full bg-transparent outline-none" placeholder="輸入場景..." value={toolInput1} onChange={e=>setToolInput1(e.target.value)}/></NeuBox>
+                <NeuBox isDark={isDark} onClick={()=>run('tool', `角色：編劇。針對場景「${toolInput1}」，提供五感描寫素材。`, setResTool)} className="w-full py-3 flex justify-center text-blue-500 font-bold">{loading==='tool'?"...":"👁️ 生成素材"}</NeuBox>
             </section>
-
-            {/* 2. 過渡橋樑 */}
             <section className="space-y-3">
                 <div className="flex items-center gap-2 ml-2"><Footprints size={16} className="text-green-500"/><span className="text-xs font-bold opacity-70">劇情過渡橋樑</span></div>
-                <div className="flex gap-3">
-                    <NeuBox isDark={isDark} pressed className="flex-1 p-4"><input className="w-full bg-transparent outline-none text-sm" placeholder="起點 (例：吵架)" value={toolInput1} onChange={e=>setToolInput1(e.target.value)}/></NeuBox>
-                    <NeuBox isDark={isDark} pressed className="flex-1 p-4"><input className="w-full bg-transparent outline-none text-sm" placeholder="終點 (例：和好)" value={toolInput2} onChange={e=>setToolInput2(e.target.value)}/></NeuBox>
-                </div>
-                <NeuBox isDark={isDark} onClick={()=>run('tool', `角色：小說家。任務：寫一段從「${toolInput1}」自然過渡到「${toolInput2}」的轉場文字，重點描寫動作、環境與氣氛變化。`, setResTool)} className="w-full py-3 flex justify-center text-green-500 font-bold">{loading==='tool'?"...":"🌉 生成轉場"}</NeuBox>
+                <div className="flex gap-3"><NeuBox isDark={isDark} pressed className="flex-1 p-4"><input className="w-full bg-transparent outline-none text-sm" placeholder="起點" value={toolInput1} onChange={e=>setToolInput1(e.target.value)}/></NeuBox><NeuBox isDark={isDark} pressed className="flex-1 p-4"><input className="w-full bg-transparent outline-none text-sm" placeholder="終點" value={toolInput2} onChange={e=>setToolInput2(e.target.value)}/></NeuBox></div>
+                <NeuBox isDark={isDark} onClick={()=>run('tool', `角色：小說家。寫一段從「${toolInput1}」過渡到「${toolInput2}」的轉場文字。`, setResTool)} className="w-full py-3 flex justify-center text-green-500 font-bold">{loading==='tool'?"...":"🌉 生成轉場"}</NeuBox>
             </section>
-
-            {/* 3. 情緒詞庫 */}
             <section className="space-y-3">
                 <div className="flex items-center gap-2 ml-2"><Smile size={16} className="text-pink-500"/><span className="text-xs font-bold opacity-70">情緒同義詞庫</span></div>
-                <div className="flex gap-3 flex-wrap">
-                    {["生氣", "高興", "難過", "害怕", "驚訝", "害羞"].map(e => (
-                        <NeuBox key={e} isDark={isDark} onClick={()=>run('tool', `角色：辭典編撰者。任務：列出 10 個形容「${e}」的高級詞彙、成語與微表情描寫，特別針對言情/同人小說常用語。`, setResTool)} className="px-4 py-2 text-xs font-bold text-purple-500 active:scale-95">{e}</NeuBox>
-                    ))}
-                </div>
-                <div className="text-[10px] opacity-40 text-center">點擊標籤獲取高級詞彙</div>
+                <div className="flex gap-3 flex-wrap">{["生氣", "高興", "難過", "害怕", "驚訝", "害羞"].map(e => (<NeuBox key={e} isDark={isDark} onClick={()=>run('tool', `角色：辭典編撰者。列出形容「${e}」的高級詞彙。`, setResTool)} className="px-4 py-2 text-xs font-bold text-purple-500 active:scale-95">{e}</NeuBox>))}</div>
             </section>
-
-            {/* 工具結果顯示區 */}
+            
             <div className="space-y-1">
                 <span className="text-xs font-bold opacity-50 ml-2">工具產出結果</span>
-                <NeuBox isDark={isDark} className="p-6 min-h-[200px] text-sm whitespace-pre-wrap leading-relaxed">{resTool || <span className="opacity-20 flex items-center justify-center h-full">等待生成...</span>}</NeuBox>
+                <ResultBox text={resTool} type="snippet" />
             </div>
          </div>
        )}
