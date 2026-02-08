@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
-  base: '/MemoLive/',  // <--- 這裡！一定要改成你的專案名稱 (前後都要有斜線)
+  base: '/MemoLive/', 
   plugins: [
     react(),
     VitePWA({
@@ -16,15 +16,16 @@ export default defineConfig({
         theme_color: '#D0D3EC',
         background_color: '#D0D3EC',
         display: 'standalone',
-        start_url: '/',
+        start_url: '/MemoLive/', // 這裡我有幫你加上專案路徑，這樣打開才不會404
+        scope: '/MemoLive/',     // 這裡也是
         icons: [
           {
-            src: '/pwa-192x192.png',
+            src: 'pwa-192x192.png', // ★★★ 修正：拿掉前面的斜線 (變成相對路徑)
             sizes: '192x192',
             type: 'image/png'
           },
           {
-            src: '/pwa-512x512.png',
+            src: 'pwa-512x512.png', // ★★★ 修正：拿掉前面的斜線
             sizes: '512x512',
             type: 'image/png'
           }
