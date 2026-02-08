@@ -2,12 +2,18 @@ import React, { useState, useEffect, useRef } from 'react';
 // ★★★ 確保所有圖示引入完整，絕不白畫面 ★★★
 import { Sparkles, Zap, Edit3, User, List, Package, Plus, X, ChevronLeft, Share2, MoreHorizontal, Send, Copy, Settings, Dice5, Save, LayoutTemplate, Moon, Sun, Globe, MessageCircle, Monitor, Wand2, Eye, Footprints, Smile, PenTool } from 'lucide-react';
 
-// --- CSS 重點：新擬態 (Neumorphism) ---
+// --- 1. 更新樣式區塊 ---
 const styles = `
   @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-  .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
+  .animate-fade-in { animation: fade-in 0.5s ease-out forwards; }
   
-  /* 隱藏滾動條但保留功能 */
+  /* ★★★ 新增：呼吸燈與淡出動畫 ★★★ */
+  @keyframes pulse-glow { 0%, 100% { opacity: 1; transform: scale(1); filter: drop-shadow(0 0 10px rgba(168,85,247,0.4)); } 50% { opacity: 0.7; transform: scale(0.95); filter: drop-shadow(0 0 20px rgba(168,85,247,0.8)); } }
+  .animate-pulse-glow { animation: pulse-glow 2s infinite ease-in-out; }
+
+  @keyframes splash-out { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-20px); pointer-events: none; } }
+  .animate-splash-out { animation: splash-out 0.6s ease-in-out forwards; }
+
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 `;
@@ -408,6 +414,33 @@ const PageMe = ({ isDark, apiKey, setApiKey, themeMode, setThemeMode }) => {
              </NeuBox>
           </div>
           <div className="px-4 text-[10px] opacity-30 flex items-center gap-1 justify-center mt-4"><Globe size={12}/> <span>已啟用 Google Search Grounding (聯網模式)</span></div>
+       </div>
+    </div>
+  );
+};
+
+// --- 2. 新增：開場動畫元件 ---
+const SplashScreen = ({ onFinish }) => {
+  const [fading, setFading] = useState(false);
+
+  useEffect(() => {
+    // 2秒後開始執行淡出動畫
+    const timer = setTimeout(() => setFading(true), 2000); 
+    // 動畫跑完(0.6秒)後，正式移除組件
+    const removeTimer = setTimeout(onFinish, 2600);
+    return () => { clearTimeout(timer); clearTimeout(removeTimer); };
+  }, [onFinish]);
+
+  return (
+    <div className={`fixed inset-0 z-[9999] bg-[#202130] flex flex-col items-center justify-center transition-all duration-500 ${fading ? 'animate-splash-out' : ''}`}>
+       <div className="relative w-24 h-24 flex items-center justify-center animate-pulse-glow">
+          <div className="absolute inset-0 bg-[#202130] rounded-[28px] shadow-[8px_8px_16px_#151620,-8px_-8px_16px_#2b2c40]"></div>
+          {/* Logo */}
+          <Edit3 size={40} className="text-purple-500 relative z-10" strokeWidth={2.5} />
+       </div>
+       <div className="mt-6 flex flex-col items-center gap-2">
+          <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-indigo-400 tracking-tight">MemoLive</h1>
+          <p className="text-[10px] font-bold text-gray-500 tracking-[0.3em] uppercase">Ultimate</p>
        </div>
     </div>
   );
