@@ -364,7 +364,6 @@ const PageVault = ({ isDark, apiKey }) => {
 };
 
 // --- 頁面: 續寫 (升級版：多檔案管理 + AI 續寫) ---
-// --- 頁面: 續寫 (終極防護修復版) ---
 const PageMemo = ({ isDark, apiKey, setShowChat }) => {
   // ★★★ 防護網 1：初始化資料庫 (絕對禁止空陣列) ★★★
   const [files, setFiles] = useState(() => {
