@@ -48,28 +48,60 @@ const NeuBox = ({ children, className = '', pressed = false, onClick, isDark, ac
 };
 
 // --- 導航列 ---
-const Navigation = ({ activeTab, setActiveTab, isDark }) => (
-  <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-[380px]">
-    <div className={`flex justify-between items-center px-6 py-4 rounded-[28px] shadow-2xl backdrop-blur-md ${isDark ? 'bg-[#202130]/90 shadow-black/40' : 'bg-[#E0E5EC]/90 shadow-gray-400/40'}`}>
-      <NavIcon icon={Edit3} label="續寫" active={activeTab === 'memo'} onClick={() => setActiveTab('memo')} isDark={isDark} />
-      <NavIcon icon={Sparkles} label="生成器" active={activeTab === 'generator'} onClick={() => setActiveTab('generator')} isDark={isDark} />
-      <NavIcon icon={Package} label="靈感庫" active={activeTab === 'vault'} onClick={() => setActiveTab('vault')} isDark={isDark} />
-      <NavIcon icon={User} label="我" active={activeTab === 'me'} onClick={() => setActiveTab('me')} isDark={isDark} />
+// --- 修正後的 Navigation (打字時自動隱藏，避免擋住鍵盤) ---
+const Navigation = ({ activeTab, setActiveTab, isDark }) => {
+  const [isVisible, setIsVisible] = useState(true);
+
+  useEffect(() => {
+    // 偵測是否正在輸入
+    const handleFocus = (e) => {
+      const tag = e.target.tagName;
+      // 如果焦點在 Input 或 Textarea，就隱藏導航列
+      if (tag === 'INPUT' || tag === 'TEXTAREA') {
+        setIsVisible(false);
+      }
+    };
+
+    const handleBlur = (e) => {
+      // 失去焦點時（收起鍵盤），稍微延遲一下再顯示，以免切換輸入框時閃爍
+      setTimeout(() => {
+        const tag = document.activeElement?.tagName;
+        if (tag !== 'INPUT' && tag !== 'TEXTAREA') {
+          setIsVisible(true);
+        }
+      }, 100);
+    };
+
+    // 使用 focusin / focusout 才能捕捉冒泡事件
+    window.addEventListener('focusin', handleFocus);
+    window.addEventListener('focusout', handleBlur);
+
+    return () => {
+      window.removeEventListener('focusin', handleFocus);
+      window.removeEventListener('focusout', handleBlur);
+    };
+  }, []);
+
+  return (
+    <div 
+      className={`
+        fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[90%] max-w-[380px] safe-bottom
+        transition-all duration-500 ease-in-out
+        ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-[200%] opacity-0'} 
+      `}
+    >
+      {/* 加上 translate-y-[200%] 讓它往下潛入海底，而不是消失，這樣動畫比較順 */}
+      <div className={`flex justify-between items-center px-6 py-4 rounded-[28px] shadow-2xl backdrop-blur-md ${isDark ? 'bg-[#202130]/90 shadow-black/40' : 'bg-[#E0E5EC]/90 shadow-gray-400/40'}`}>
+        <NavIcon icon={Edit3} label="續寫" active={activeTab === 'memo'} onClick={() => setActiveTab('memo')} isDark={isDark} />
+        <NavIcon icon={Sparkles} label="生成器" active={activeTab === 'generator'} onClick={() => setActiveTab('generator')} isDark={isDark} />
+        <NavIcon icon={Package} label="靈感庫" active={activeTab === 'vault'} onClick={() => setActiveTab('vault')} isDark={isDark} />
+        <NavIcon icon={User} label="我" active={activeTab === 'me'} onClick={() => setActiveTab('me')} isDark={isDark} />
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
-const NavIcon = ({ icon: Icon, label, active, onClick, isDark }) => (
-  <div onClick={onClick} className="flex flex-col items-center gap-1.5 cursor-pointer group">
-    <NeuBox isDark={isDark} active={active} className={`w-12 h-12 flex items-center justify-center rounded-[18px] transition-all duration-300`}>
-      <Icon size={22} strokeWidth={2.5} className={active ? 'drop-shadow-[0_0_5px_rgba(168,85,247,0.5)]' : ''} />
-    </NeuBox>
-    <span className={`text-[10px] font-bold tracking-wide transition-colors ${active ? 'text-purple-500' : 'text-transparent scale-0 h-0'}`}>{label}</span>
-  </div>
-);
-
-// --- 對話介面 ---
-// --- 修正後的 ChatInterface (真實串接 AI + 自動捲動) ---
+// --- 對話介面 (真實串接 AI + 自動捲動) ---
 const ChatInterface = ({ onClose }) => {
   const [messages, setMessages] = useState([{role: 'ai', text: '（探頭）我是你的角色靈魂... 你想跟我聊什麼劇情？'}]);
   const [input, setInput] = useState("");
