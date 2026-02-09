@@ -495,20 +495,25 @@ const PageVault = ({ isDark, apiKey }) => {
 
   useEffect(() => { localStorage.setItem('memo_vault', JSON.stringify(items)); }, [items]); 
   
-  const addItem = (content = newItemContent, type = tab) => { 
-      if (!content.trim()) return; 
-      setItems([{ id: Date.now(), type: type, content: content, date: new Date().toLocaleDateString() }, ...items]); 
-      setNewItemContent(''); 
-      setIsAdding(false); 
-      setSlotResult(""); 
-  }; 
-
-  const updateItem = (id) => {
-    if (!editContent.trim()) return;
-    setItems(items.map(item => item.id === id ? { ...item, content: editContent } : item));
-    setEditingId(null); 
-    setEditContent("");
+  const addItem = (content = newItemContent, type = tab) => {
+  if (!content.trim()) return;
+  const newItem = {
+    id: Date.now() + Math.floor(Math.random() * 1000),
+    type,
+    content,
+    date: new Date().toLocaleDateString()
   };
+  setItems(prev => [newItem, ...(Array.isArray(prev) ? prev : [])]);
+  setNewItemContent('');
+  setIsAdding(false);
+  setSlotResult("");
+};
+
+const updateItem = (id) => {
+  if (!editContent.trim()) return;
+  setItems(prev => (Array.isArray(prev) ? prev : []).map(item => item.id === id ? { ...item, content: editContent } : item));
+  setEditingId(null);
+  setEditContent("");
 
   const startEditing = (item) => {
     setEditingId(item.id);
@@ -516,10 +521,8 @@ const PageVault = ({ isDark, apiKey }) => {
   };
 
   const confirmDelete = (id) => {
-      if(window.confirm("確定要將這條靈感丟進垃圾桶嗎？")) {
-          setItems(items.filter(i => i.id !== id));
-      }
-  };
+  if (window.confirm("確定要將這條靈感丟進垃圾桶嗎？")) setItems(prev => (Array.isArray(prev) ? prev : []).filter(i => i.id !== id));
+};
   
   // ★★★ 修改：過濾邏輯加入搜尋 ★★★
   const filteredItems = items.filter(i => {
@@ -843,13 +846,13 @@ const PageGenerator = ({ isDark, apiKey }) => {
          <div className="space-y-8 animate-fade-in">
             <section className="space-y-3">
                 <div className="flex items-center gap-2 ml-2"><Eye size={16} className="text-blue-500"/><span className="text-xs font-bold opacity-70">五感描寫素材</span></div>
-                <NeuBox isDark={isDark} pressed className="p-5"><input className="w-full bg-transparent outline-none" placeholder="輸入場景..." value={toolInput1} onChange={e=>setToolInput1(e.target.value)}/></NeuBox>
-                <NeuBox isDark={isDark} onClick={()=>run('tool', `角色：編劇。針對場景「${toolInput1}」，提供五感描寫素材。`, setResTool)} className="w-full py-3 flex justify-center text-blue-500 font-bold">{loading==='tool'?"...":"👁️ 生成素材"}</NeuBox>
+                <NeuBox isDark={isDark} pressed className="p-5"><input className="w-full bg-transparent outline-none" placeholder="輸入場景..." value={senseScene} onChange={e=>setSenseScene(e.target.value)}/></NeuBox>
+                <NeuBox isDark={isDark} onClick={()=>run('tool', `角色：編劇。針對場景「${senseScene}」，提供五感描寫素材。`, setResTool)} className="w-full py-3 flex justify-center text-blue-500 font-bold">{loading==='tool'?"...":"👁️ 生成素材"}</NeuBox>
             </section>
             <section className="space-y-3">
                 <div className="flex items-center gap-2 ml-2"><Footprints size={16} className="text-green-500"/><span className="text-xs font-bold opacity-70">劇情過渡橋樑</span></div>
-                <div className="flex gap-3"><NeuBox isDark={isDark} pressed className="flex-1 p-4"><input className="w-full bg-transparent outline-none text-sm" placeholder="起點" value={toolInput1} onChange={e=>setToolInput1(e.target.value)}/></NeuBox><NeuBox isDark={isDark} pressed className="flex-1 p-4"><input className="w-full bg-transparent outline-none text-sm" placeholder="終點" value={toolInput2} onChange={e=>setToolInput2(e.target.value)}/></NeuBox></div>
-                <NeuBox isDark={isDark} onClick={()=>run('tool', `角色：小說家。寫一段從「${toolInput1}」過渡到「${toolInput2}」的轉場文字。`, setResTool)} className="w-full py-3 flex justify-center text-green-500 font-bold">{loading==='tool'?"...":"🌉 生成轉場"}</NeuBox>
+                <div className="flex gap-3"><NeuBox isDark={isDark} pressed className="flex-1 p-4"><input className="w-full bg-transparent outline-none text-sm" placeholder="起點" value={bridgeFrom} onChange={e=>setBridgeFrom(e.target.value)}/></NeuBox><NeuBox isDark={isDark} pressed className="flex-1 p-4"><input className="w-full bg-transparent outline-none text-sm" placeholder="終點" value={bridgeTo} onChange={e=>setBridgeTo(e.target.value)}/></NeuBox></div>
+                <NeuBox isDark={isDark} onClick={()=>run('tool', `角色：小說家。寫一段從「${bridgeFrom}」過渡到「${bridgeTo}」的轉場文字。`, setResTool)} className="w-full py-3 flex justify-center text-green-500 font-bold">{loading==='tool'?"...":"🌉 生成轉場"}</NeuBox>
             </section>
             <section className="space-y-3">
                 <div className="flex items-center gap-2 ml-2"><Smile size={16} className="text-pink-500"/><span className="text-xs font-bold opacity-70">情緒同義詞庫</span></div>
@@ -957,7 +960,7 @@ const PageMe = ({ isDark, apiKey, setApiKey, themeMode, setThemeMode, files }) =
 
 // --- 11. App 主程式 (全域狀態提升、解決側邊欄覆蓋問題) ---
 const App = () => {
-  const [showSplash, setShowSplash] = useState(true); 
+  const [showSplash, setShowSplash] = useState(false);
   const [activeTab, setActiveTab] = useState("memo");
   const [apiKey, setApiKey] = useState(localStorage.getItem("gemini_key") || "");
   const [themeMode, setThemeMode] = useState(localStorage.getItem("theme_mode") || "system");
@@ -989,6 +992,11 @@ const App = () => {
 
   // 檔案存檔副作用
   useEffect(() => { if(files.length > 0) localStorage.setItem("memo_files", JSON.stringify(files)); }, [files]);
+  useEffect(() => {
+  if (!Array.isArray(files) || files.length === 0) return;
+  const exists = files.some(f => f?.id === activeFileId);
+  if (!exists) setActiveFileId(files[0].id);
+}, [files, activeFileId]);
 
   useEffect(() => {
     const applyTheme = () => { const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches; setIsDark(themeMode === 'system' ? systemDark : themeMode === 'dark'); };
@@ -998,11 +1006,15 @@ const App = () => {
 
   // 新增檔案邏輯
   const createNewFile = () => {
-    const newFile = { id: Date.now(), title: `新檔案 ${files.length + 1}`, content: "", lastModified: new Date().toLocaleString() };
-    setFiles([newFile, ...files]);
-    setActiveFileId(newFile.id);
-    setShowSidebar(false);
-  };
+  const newId = Date.now() + Math.floor(Math.random() * 1000);
+  setFiles(prev => {
+    const safePrev = Array.isArray(prev) ? prev : [];
+    const newFile = { id: newId, title: `新檔案 ${safePrev.length + 1}`, content: "", lastModified: new Date().toLocaleString() };
+    return [newFile, ...safePrev];
+  });
+  setActiveFileId(newId);
+  setShowSidebar(false);
+};
 
   // 刪除檔案邏輯
   const deleteFile = (e, id) => {
@@ -1015,7 +1027,7 @@ const App = () => {
     }
   };
 
-  if (showSplash) return <SplashScreen onFinish={() => setShowSplash(false)} />;
+  if (showSplash) return null;
   if (showChat) return <ChatInterface onClose={() => setShowChat(false)} />;
 
   return (
