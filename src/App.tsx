@@ -364,6 +364,37 @@ const PageVault = ({ isDark, apiKey }) => {
 };
 
 // --- 頁面: 續寫 (升級版：多檔案管理 + AI 續寫) ---
+  const [files, setFiles] = useState(() => {
+    try {
+      const savedFiles = localStorage.getItem("memo_files");
+      if (savedFiles) {
+        const parsed = JSON.parse(savedFiles);
+        // 防護 1: 確保是有效陣列
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // 防護 2: 遍歷所有檔案，強制補齊缺失欄位 (這就是解決黑屏的關鍵)
+          return parsed.map(f => ({
+            ...f, // 保留原有的 id, title, content
+            title: f.title || "未命名檔案",
+            content: f.content || "",
+            // 🔴 這裡！如果舊檔案沒有時間，自動補上現在時間，防止 .split() 崩潰
+            lastModified: f.lastModified || new Date().toLocaleString() 
+          }));
+        }
+      }
+      // 防護 3: 如果完全沒檔案，讀取舊草稿或建立新的
+      const oldDraft = localStorage.getItem("memo_draft");
+      return [{ 
+        id: Date.now(), 
+        title: "未命名檔案", 
+        content: oldDraft || "", 
+        lastModified: new Date().toLocaleString() 
+      }];
+    } catch {
+      // 防護 4: 極端狀況回傳預設值
+      return [{ id: Date.now(), title: "未命名檔案", content: "", lastModified: new Date().toLocaleString() }];
+    }
+  });
+
 const PageMemo = ({ isDark, apiKey, setShowChat }) => {
   // ★★★ 防護網 1：初始化資料庫 (確保永遠不會是空陣列) ★★★
   const [files, setFiles] = useState(() => {
@@ -516,8 +547,10 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
                    >
                      <div className="flex items-center gap-3 overflow-hidden">
                        <FileText size={18} className={activeFileId === file.id ? 'opacity-100' : 'opacity-50'}/>
-                       <div className="flex flex-col truncate">
-                         <span className="text-sm font-bold truncate">{file.title}</span>
+                      {/* 防護 5: 顯示時再次防呆，防止 undefined 導致 split 報錯 */}
+                       <span className="text-[10px] opacity-60">
+                        {(file.lastModified || "").split(' ')[0]}
+                        </span>
                          {/* 這裡加了防護，防止 lastModified 不存在時報錯 */}
                          <span className="text-[10px] opacity-60">{(file.lastModified || "").split(' ')[0]}</span>
                        </div>
