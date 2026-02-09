@@ -103,90 +103,60 @@ const Navigation = ({ activeTab, setActiveTab, isDark }) => {
 };
 
 // --- 對話介面 (真實串接 AI + 自動捲動) ---
+// --- 對話介面 (修正版：找回 Sticky 輸入框) ---
 const ChatInterface = ({ onClose }) => {
   const [messages, setMessages] = useState([{role: 'ai', text: '（探頭）我是你的角色靈魂... 你想跟我聊什麼劇情？'}]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef(null);
-  
-  // 直接從 localStorage 拿 API Key，確保獨立運作
   const apiKey = localStorage.getItem("gemini_key");
 
-  // 有新訊息時自動捲動到底部
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   const sendMessage = async () => {
     if (!input.trim()) return;
     if (!apiKey) return alert("請先去「我」的頁面設定 API Key 喔！");
     if (loading) return;
-
     const userMsg = input;
     setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
     setInput("");
     setLoading(true);
-
     try {
-      // 設定 AI 角色扮演的 Prompt
-      const prompt = `System: 你現在是使用者筆下小說中的角色。請完全進入角色，用該角色的口吻、語氣、性格與作者（使用者）對話。不要跳出角色。
-      
-      User: ${userMsg}`;
-      
+      const prompt = `System: 你現在是使用者筆下小說中的角色。請完全進入角色，用該角色的口吻、語氣、性格與作者（使用者）對話。不要跳出角色。User: ${userMsg}`;
       const reply = await callGemini(apiKey, prompt, false);
       setMessages(prev => [...prev, { role: 'ai', text: reply }]);
-    } catch (e) {
-      setMessages(prev => [...prev, { role: 'ai', text: "😵 訊號中斷... (" + e.message + ")" }]);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { setMessages(prev => [...prev, { role: 'ai', text: "😵 " + e.message }]); } 
+    finally { setLoading(false); }
   };
 
   return (
     <div className="fixed inset-0 z-[100] bg-[#1a1b23] flex flex-col animate-fade-in">
-      {/* 頂部導航 */}
-      <div className="flex items-center justify-between p-4 pt-12 border-b border-white/5 bg-[#1a1b23]">
-        <button onClick={onClose} className="flex items-center gap-1 text-gray-400 text-sm font-bold active:scale-95"><ChevronLeft size={20}/> 返回</button>
-        <span className="text-white font-bold text-sm tracking-wider">角色實時互動空間</span>
-        <div className="flex gap-3 text-gray-400"><Share2 size={20}/><MoreHorizontal size={20}/></div>
+      <div className="safe-top bg-[#1a1b23] z-30">
+        <div className="flex items-center justify-between p-4 border-b border-white/5">
+            <button onClick={onClose} className="flex items-center gap-1 text-gray-400 text-sm font-bold active:scale-95"><ChevronLeft size={20}/> 返回</button>
+            <span className="text-white font-bold text-sm tracking-wider">角色實時互動</span>
+            <div className="flex gap-3 text-gray-400"><Share2 size={20}/><MoreHorizontal size={20}/></div>
+        </div>
       </div>
-
-      {/* 聊天內容區 */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
          {messages.map((m, i) => (
-           <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-             <div className={`max-w-[85%] p-3 rounded-2xl text-sm leading-relaxed allow-select ${m.role === 'user' ? 'bg-purple-600 text-white rounded-br-none' : 'bg-[#252630] text-gray-200 rounded-bl-none border border-white/5'}`}>
-               {m.text}
-             </div>
+           <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}>
+             <div className={`max-w-[85%] p-3 rounded-2xl text-sm leading-relaxed allow-select ${m.role === 'user' ? 'bg-purple-600 text-white rounded-br-none' : 'bg-[#252630] text-gray-200 rounded-bl-none border border-white/5'}`}>{m.text}</div>
            </div>
          ))}
-         {loading && <div className="text-xs text-gray-500 animate-pulse ml-2">角色正在輸入...</div>}
+         {loading && <div className="text-xs text-gray-500 animate-pulse ml-2 flex items-center gap-1"><Sparkles size={12}/> 角色正在輸入...</div>}
          <div ref={bottomRef} />
       </div>
-
-      {/* 輸入區 */}
-      <div className="p-4 pb-10 bg-[#1a1b23]">
-         <div className="bg-[#252630] rounded-[20px] p-1.5 pl-5 flex items-center shadow-lg border border-white/5">
-            <input 
-              className="flex-1 bg-transparent outline-none text-white text-sm h-10 placeholder-gray-600" 
-              placeholder="輸入你想說的話..." 
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && sendMessage()}
-            />
-            <button 
-              onClick={sendMessage}
-              disabled={loading}
-              className={`w-10 h-10 rounded-full flex items-center justify-center text-white shadow-lg transition-transform ${loading ? 'bg-gray-600' : 'bg-purple-600 active:scale-90'}`}
-            >
-              <Send size={18} className="ml-0.5"/>
-            </button>
+      {/* 🔴 這裡加回了 sticky bottom-0 和 safe-bottom，打字體驗才會好！ */}
+      <div className="p-4 pb-10 bg-[#1a1b23] sticky bottom-0 z-20 border-t border-white/5 safe-bottom">
+         <div className="bg-[#252630] rounded-[24px] p-1.5 pl-5 flex items-center shadow-lg border border-white/5">
+            <input className="flex-1 bg-transparent outline-none text-white text-sm h-10 placeholder-gray-500" placeholder="輸入你想說的話..." value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendMessage()}/>
+            <button onClick={sendMessage} disabled={loading} className={`w-10 h-10 rounded-full flex items-center justify-center text-white shadow-lg transition-transform ${loading?'bg-gray-600':'bg-purple-600 active:scale-90'}`}><Send size={18} className="ml-0.5"/></button>
          </div>
       </div>
     </div>
   );
 };
-
 
 // --- API 核心 ---
 const callGemini = async (apiKey, prompt, useWeb = false) => {
@@ -397,12 +367,17 @@ const PageVault = ({ isDark, apiKey }) => {
 
 // --- 頁面: 續寫 (升級版：多檔案管理 + AI 續寫) ---
 const PageMemo = ({ isDark, apiKey, setShowChat }) => {
-  // ★★★ 1. 初始化資料庫 (含舊資料遷移邏輯) ★★★
+  // ★★★ 1. 初始化資料庫 (加強防護：絕對不允許空陣列) ★★★
   const [files, setFiles] = useState(() => {
     try {
       const savedFiles = localStorage.getItem("memo_files");
-      if (savedFiles) return JSON.parse(savedFiles);
-      
+      if (savedFiles) {
+        const parsed = JSON.parse(savedFiles);
+        // 🔴 關鍵修復：如果讀出來是空的，就不要用它！直接往下走去建立新檔案
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
       // 如果沒有新版檔案，檢查有沒有舊版草稿 (自動遷移)
       const oldDraft = localStorage.getItem("memo_draft");
       return [{ 
@@ -416,29 +391,29 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
     }
   });
 
-  // 當前開啟的檔案 ID
-  const [activeFileId, setActiveFileId] = useState(() => files[0].id);
-  const [showFileList, setShowFileList] = useState(false); // 控制檔案列表側邊欄
+  // 當前開啟的檔案 ID (這裡加了 ?. 防呆，雖然上面已經擋住了，但多一層保險)
+  const [activeFileId, setActiveFileId] = useState(() => files[0]?.id || Date.now());
+  const [showFileList, setShowFileList] = useState(false);
   
   // AI 相關狀態
   const [res, setRes] = useState("");
   const [loading, setLoading] = useState(false);
   const textAreaRef = useRef(null);
 
-  // 取得當前檔案物件
+  // 取得當前檔案物件 (如果找不到 ID，就預設回傳第一個檔案，防止崩潰)
   const activeFile = files.find(f => f.id === activeFileId) || files[0];
 
-  // ★★★ 2. 自動存檔 (存整個檔案列表) ★★★
+  // 自動存檔
   useEffect(() => {
     localStorage.setItem("memo_files", JSON.stringify(files));
   }, [files]);
 
-  // 更新當前檔案內容
+  // 更新內容
   const updateContent = (newContent) => {
     setFiles(files.map(f => f.id === activeFileId ? { ...f, content: newContent, lastModified: new Date().toLocaleString() } : f));
   };
 
-  // 更新當前檔案標題
+  // 更新標題
   const updateTitle = (newTitle) => {
     setFiles(files.map(f => f.id === activeFileId ? { ...f, title: newTitle } : f));
   };
@@ -452,8 +427,8 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
       lastModified: new Date().toLocaleString()
     };
     setFiles([newFile, ...files]);
-    setActiveFileId(newFile.id); // 自動切換到新檔案
-    setShowFileList(false); // 關閉列表
+    setActiveFileId(newFile.id);
+    setShowFileList(false);
   };
 
   // 刪除檔案
@@ -463,11 +438,12 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
     if (window.confirm("確定要刪除這個檔案嗎？無法復原喔。")) {
       const newFiles = files.filter(f => f.id !== id);
       setFiles(newFiles);
-      if (activeFileId === id) setActiveFileId(newFiles[0].id); // 如果刪除的是當前檔案，切換到第一個
+      // 如果刪除的是當前檔案，切換到剩下的第一個
+      if (activeFileId === id) setActiveFileId(newFiles[0].id);
     }
   };
 
-  // --- AI 功能 (對接 activeFile.content) ---
+  // AI 功能
   const gen = async () => {
     if (!apiKey) return alert("請設定 API Key");
     if (!activeFile.content) return alert("內容不能為空");
@@ -523,7 +499,7 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
           </div>
        </div>
 
-       {/* ★★★ 檔案列表側邊欄 (Drawer) ★★★ */}
+       {/* 檔案列表側邊欄 */}
        {showFileList && (
          <div className="absolute inset-0 z-50 flex animate-fade-in" style={{top: '-20px', left: '-20px', width: 'calc(100% + 40px)', height: 'calc(100% + 100px)'}}>
             <div className={`w-3/4 h-full p-5 flex flex-col gap-4 shadow-2xl backdrop-blur-xl ${isDark ? 'bg-[#1a1b23]/95' : 'bg-[#E0E5EC]/95'}`}>
@@ -531,7 +507,6 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
                  <span className="font-bold text-lg flex items-center gap-2"><FolderOpen size={20}/> 我的檔案</span>
                  <button onClick={() => setShowFileList(false)}><X size={20} className="opacity-50"/></button>
                </div>
-               
                <div className="flex-1 overflow-y-auto space-y-3 no-scrollbar">
                  {files.map(file => (
                    <div 
@@ -558,12 +533,10 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
                    </div>
                  ))}
                </div>
-
                <button onClick={createNewFile} className="w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl text-white font-bold shadow-lg flex items-center justify-center gap-2 active:scale-95">
                  <FilePlus size={18}/> 新增檔案
                </button>
             </div>
-            {/* 點擊半透明背景關閉 */}
             <div className="flex-1 bg-black/50" onClick={() => setShowFileList(false)}></div>
          </div>
        )}
@@ -581,16 +554,13 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
          <button onClick={expandSentence} className="absolute bottom-4 right-4 p-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full shadow-lg text-white active:scale-90 transition-transform flex items-center justify-center" title="✨ 擴寫選取文字"><Wand2 size={20}/></button>
        </NeuBox>
 
-       {/* 功能按鈕區 */}
        <div className="flex gap-4">
-         <NeuBox isDark={isDark} onClick={gen} className="flex-1 py-4 flex justify-center gap-2 font-bold text-purple-500 text-sm">{loading ? <span className="animate-pulse">✨ 寫作中...</span> : <><Zap size={18}/> 續寫</>}</NeuBox>
+         <NeuBox isDark={isDark} onClick={gen} className="flex-1 py-4 flex justify-center gap-2 font-bold text-purple-500 text-sm">{loading ? <span className="animate-pulse">✨ 寫作中...</span> : <><Zap size={18}/> 續寫 (聯網+長文)</>}</NeuBox>
          <NeuBox isDark={isDark} onClick={() => setShowChat(true)} className="flex-1 py-4 flex justify-center gap-2 font-bold text-pink-500 text-sm"><MessageCircle size={18}/> 對話</NeuBox>
        </div>
 
-       {/* AI 結果區 */}
        <div className="flex flex-col gap-3">
           <div className="flex justify-between px-2 opacity-50"><span className="text-xs font-bold">AI 產出結果 (1500字+)</span>{res && <Copy size={14}/>}</div>
-          
           <div className="relative group">
              <NeuBox isDark={isDark} className="p-6 min-h-[250px] text-sm whitespace-pre-wrap leading-relaxed allow-select">
                 {res || <span className="opacity-20 text-xs flex items-center justify-center h-full">等待生成...</span>}
