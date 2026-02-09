@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 // ★★★ 確保所有圖示引入完整，絕不白畫面 ★★★
-import { Sparkles, Zap, Edit3, User, List, Package, Plus, X, ChevronLeft, Share2, MoreHorizontal, Send, Copy, Settings, Dice5, Save, LayoutTemplate, Moon, Sun, Globe, MessageCircle, Monitor, Wand2, Eye, Footprints, Smile, PenTool, Trash2 } from 'lucide-react';
+import { Sparkles, Zap, Edit3, User, List, Package, Plus, X, ChevronLeft, Share2, MoreHorizontal, Send, Copy, Settings, Dice5, Save, LayoutTemplate, Moon, Sun, Globe, MessageCircle, Monitor, Wand2, Eye, Footprints, Smile, PenTool, Trash2, Download, Upload } from 'lucide-react';
 
 // --- 1. 更新樣式區塊 ---
 const styles = `
@@ -255,17 +255,18 @@ const SlotMachine = ({ isDark, apiKey, onResult }) => {
   );
 };
 
-// --- 頁面: 靈感庫 ---
+// --- 頁面: 靈感庫 (含搜尋功能 + 編輯 + 刪除確認) ---
 const PageVault = ({ isDark, apiKey }) => {
   const [tab, setTab] = useState('snippet'); 
   const [items, setItems] = useState(() => { try { return JSON.parse(localStorage.getItem('memo_vault') || '[]'); } catch { return []; } }); 
   const [newItemContent, setNewItemContent] = useState(''); 
   const [isAdding, setIsAdding] = useState(false); 
   const [slotResult, setSlotResult] = useState("");
-
-  // ★★★ 新增：編輯狀態管理 ★★★
   const [editingId, setEditingId] = useState(null); 
   const [editContent, setEditContent] = useState(""); 
+  
+  // ★★★ 新增：搜尋關鍵字狀態 ★★★
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => { localStorage.setItem('memo_vault', JSON.stringify(items)); }, [items]); 
   
@@ -277,7 +278,6 @@ const PageVault = ({ isDark, apiKey }) => {
       setSlotResult(""); 
   }; 
 
-  // ★★★ 新增：更新項目 ★★★
   const updateItem = (id) => {
     if (!editContent.trim()) return;
     setItems(items.map(item => item.id === id ? { ...item, content: editContent } : item));
@@ -285,21 +285,47 @@ const PageVault = ({ isDark, apiKey }) => {
     setEditContent("");
   };
 
-  // ★★★ 新增：開始編輯 ★★★
   const startEditing = (item) => {
     setEditingId(item.id);
     setEditContent(item.content);
   };
+
+  const confirmDelete = (id) => {
+      if(window.confirm("確定要將這條靈感丟進垃圾桶嗎？")) {
+          setItems(items.filter(i => i.id !== id));
+      }
+  };
   
-  const filteredItems = items.filter(i => i.type === tab); 
+  // ★★★ 修改：過濾邏輯加入搜尋 ★★★
+  const filteredItems = items.filter(i => {
+    const matchTab = i.type === tab;
+    const matchSearch = i.content.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchTab && matchSearch;
+  });
+
   const TabBtn = ({ id, label, icon: Icon }) => ( <NeuBox isDark={isDark} active={tab === id} onClick={() => setTab(id)} className="flex-1 py-3 flex justify-center items-center gap-2 text-xs font-bold"><Icon size={16}/> {label} </NeuBox> );
 
   return (
     <div className="space-y-4 animate-fade-in pb-32 h-full flex flex-col">
        <div className="flex items-center gap-2 opacity-60 px-2 mt-2"><Package size={20}/> <h2 className="text-xl font-bold">靈感庫</h2></div>
        
+       {/* ★★★ 新增：搜尋列 ★★★ */}
+       <div className="px-1">
+         <div className={`flex items-center px-3 py-2 rounded-xl border ${isDark ? 'bg-black/20 border-white/10' : 'bg-white/40 border-black/5'}`}>
+            <Search size={14} className="opacity-50 mr-2"/>
+            <input 
+              className="bg-transparent outline-none text-xs w-full placeholder-opacity-50" 
+              placeholder="搜尋靈感..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            {searchTerm && <button onClick={()=>setSearchTerm("")}><X size={14} className="opacity-50"/></button>}
+         </div>
+       </div>
+
        <SlotMachine isDark={isDark} apiKey={apiKey} onResult={setSlotResult} />
        
+       {/* ... (中間 slotResult 和 TabBtn 保持不變，省略以節省篇幅，請保留原代碼) ... */}
        {slotResult && ( 
          <div className="animate-fade-in mb-2">
             <div className="flex justify-between items-center px-2 mb-2 opacity-70"><span className="text-xs font-bold text-purple-400">🎉 生成結果</span></div>
@@ -314,7 +340,7 @@ const PageVault = ({ isDark, apiKey }) => {
        )}
 
        <div className="flex gap-3 px-1"><TabBtn id="snippet" label="碎片" icon={List} /><TabBtn id="char" label="人設" icon={User} /><TabBtn id="world" label="設定" icon={Sparkles} /></div>
-       
+
        {isAdding ? ( 
           <div className="animate-fade-in space-y-3 z-10">
             <NeuBox isDark={isDark} pressed className="p-4 border border-purple-500/50">
@@ -331,26 +357,21 @@ const PageVault = ({ isDark, apiKey }) => {
        
        <div className={`flex-grow overflow-hidden rounded-[24px] p-1 ${isDark ? 'bg-[#161722]/50 shadow-[inset_2px_2px_6px_#0b0c15,inset_-2px_-2px_6px_#2a2c38]' : 'bg-[#D1D9E6] shadow-[inset_2px_2px_6px_#b8b9be,inset_-2px_-2px_6px_#ffffff]'}`}>
          <div className="h-full overflow-y-auto p-3 space-y-3 no-scrollbar">
+            {/* 搜尋結果為空的顯示 */}
             {filteredItems.length === 0 && !isAdding && (
                 <div className="h-full flex flex-col items-center justify-center opacity-30 gap-2">
-                    <Package size={40} strokeWidth={1} />
-                    <span className="text-xs">這裡還沒有資料...</span>
+                    {searchTerm ? <span className="text-xs">找不到 "{searchTerm}"</span> : <><Package size={40} strokeWidth={1}/><span className="text-xs">這裡還沒有資料...</span></>}
                 </div>
             )}
+            {/* ... (下面的 items map 保持不變，省略) ... */}
             {filteredItems.map(item => (
               <NeuBox key={item.id} isDark={isDark} className="p-4 relative group animate-fade-in border border-white/5">
-                {/* ★★★ 編輯模式切換邏輯 ★★★ */}
                 {editingId === item.id ? (
                     <div className="space-y-3 animate-fade-in">
-                        <textarea 
-                            autoFocus
-                            className="w-full h-32 bg-black/20 rounded-lg p-2 text-sm outline-none resize-none text-gray-200 allow-select" 
-                            value={editContent} 
-                            onChange={e => setEditContent(e.target.value)}
-                        />
+                        <textarea autoFocus className="w-full h-32 bg-black/20 rounded-lg p-2 text-sm outline-none resize-none text-gray-200 allow-select" value={editContent} onChange={e => setEditContent(e.target.value)}/>
                         <div className="flex gap-2 justify-end">
                             <button onClick={() => setEditingId(null)} className="px-3 py-1.5 text-xs text-gray-400 font-bold active:scale-95">取消</button>
-                            <button onClick={() => updateItem(item.id)} className="px-3 py-1.5 bg-purple-600 text-white text-xs rounded-lg shadow-lg font-bold active:scale-95">保存修改</button>
+                            <button onClick={() => updateItem(item.id)} className="px-3 py-1.5 bg-purple-600 text-white text-xs rounded-lg shadow-lg font-bold active:scale-95">保存</button>
                         </div>
                     </div>
                 ) : (
@@ -359,14 +380,8 @@ const PageVault = ({ isDark, apiKey }) => {
                         <div className="flex justify-between items-center mt-3 pt-3 border-t border-white/5 opacity-50">
                             <span className="text-[10px] font-bold tracking-wider">{item.date}</span>
                             <div className="flex gap-3">
-                                {/* 編輯按鈕 */}
-                                <button onClick={(e)=>{e.stopPropagation(); startEditing(item)}} className="p-2 text-blue-400 hover:text-blue-500 active:scale-90 transition-transform">
-                                    <Edit3 size={16}/>
-                                </button>
-                                {/* 刪除按鈕 */}
-                                <button onClick={(e)=>{e.stopPropagation(); setItems(items.filter(i=>i.id!==item.id))}} className="p-2 text-red-400 hover:text-red-500 active:scale-90 transition-transform">
-                                    <Trash2 size={16}/>
-                                </button>
+                                <button onClick={(e)=>{e.stopPropagation(); startEditing(item)}} className="p-2 text-blue-400 hover:text-blue-500 active:scale-90 transition-transform"><Edit3 size={16}/></button>
+                                <button onClick={(e)=>{e.stopPropagation(); confirmDelete(item.id)}} className="p-2 text-red-400 hover:text-red-500 active:scale-90 transition-transform"><Trash2 size={16}/></button>
                             </div>
                         </div>
                     </>
@@ -597,11 +612,52 @@ const PageGenerator = ({ isDark, apiKey }) => {
 // --- 頁面: 我 (修復：淺/深/系統 模式切換) ---
 const PageMe = ({ isDark, apiKey, setApiKey, themeMode, setThemeMode }) => {
   const [show, setShow] = useState(false);
+
+  // ★★★ 匯出資料功能 ★★★
+  const exportData = () => {
+    const data = {
+      memo_draft: localStorage.getItem('memo_draft'),
+      memo_vault: localStorage.getItem('memo_vault'),
+      gemini_key: localStorage.getItem('gemini_key'),
+      theme_mode: localStorage.getItem('theme_mode')
+    };
+    const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `MemoLive_Backup_${new Date().toLocaleDateString()}.json`;
+    a.click();
+    alert("✅ 資料備份已下載！");
+  };
+
+  // ★★★ 匯入資料功能 ★★★
+  const importData = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        if(data.memo_draft) localStorage.setItem('memo_draft', data.memo_draft);
+        if(data.memo_vault) localStorage.setItem('memo_vault', data.memo_vault);
+        if(data.gemini_key) localStorage.setItem('gemini_key', data.gemini_key);
+        if(data.theme_mode) localStorage.setItem('theme_mode', data.theme_mode);
+        alert("✅ 資料還原成功！請重新整理網頁。");
+        window.location.reload();
+      } catch (err) {
+        alert("❌ 檔案格式錯誤！");
+      }
+    };
+    reader.readAsText(file);
+  };
+
   return (
     <div className="space-y-8 animate-fade-in pb-32">
        <div className="flex items-center gap-2 opacity-60 px-2 mt-2"><User size={20}/> <h2 className="text-xl font-bold">我的</h2></div>
        <NeuBox isDark={isDark} className="p-8 flex flex-col items-center justify-center gap-3 opacity-60"><LayoutTemplate size={40} /><span className="text-sm font-bold tracking-widest">PRO 創作模式</span></NeuBox>
+       
        <div className="space-y-5">
+          {/* 外觀主題 (保持不變) */}
           <div className="space-y-2">
              <span className="text-xs font-bold opacity-50 ml-2">外觀主題</span>
              <NeuBox isDark={isDark} className="p-2 flex gap-3">
@@ -610,6 +666,26 @@ const PageMe = ({ isDark, apiKey, setApiKey, themeMode, setThemeMode }) => {
                 <NeuBox isDark={isDark} active={themeMode === 'system'} onClick={() => setThemeMode('system')} className="flex-1 py-3 flex flex-col items-center justify-center gap-1"><Monitor size={20} /><span className="text-[10px] font-bold">系統</span></NeuBox>
              </NeuBox>
           </div>
+
+          {/* ★★★ 新增：資料管理區塊 ★★★ */}
+          <div className="space-y-2">
+             <span className="text-xs font-bold opacity-50 ml-2">資料管理 (換手機必用)</span>
+             <div className="flex gap-3">
+                <NeuBox isDark={isDark} onClick={exportData} className="flex-1 py-4 flex flex-col items-center justify-center gap-2 cursor-pointer active:scale-95">
+                    <Download size={20} className="text-blue-500"/>
+                    <span className="text-xs font-bold">備份資料</span>
+                </NeuBox>
+                <label className="flex-1 relative">
+                    <input type="file" accept=".json" onChange={importData} className="hidden" />
+                    <NeuBox isDark={isDark} className="h-full py-4 flex flex-col items-center justify-center gap-2 cursor-pointer active:scale-95">
+                        <Upload size={20} className="text-green-500"/>
+                        <span className="text-xs font-bold">還原資料</span>
+                    </NeuBox>
+                </label>
+             </div>
+          </div>
+
+          {/* 系統設定 (保持不變) */}
           <div className="space-y-2">
              <span className="text-xs font-bold opacity-50 ml-2">系統設定</span>
              <NeuBox isDark={isDark} className="p-5">
