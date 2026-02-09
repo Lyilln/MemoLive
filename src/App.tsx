@@ -364,20 +364,22 @@ const PageVault = ({ isDark, apiKey }) => {
 };
 
 // --- 頁面: 續寫 (升級版：多檔案管理 + AI 續寫) ---
+// --- 頁面: 續寫 (終極防護修復版) ---
 const PageMemo = ({ isDark, apiKey, setShowChat }) => {
-  // ★★★ 1. 初始化資料庫 (加強防護：絕對不允許空陣列) ★★★
+  // ★★★ 防護網 1：初始化資料庫 (絕對禁止空陣列) ★★★
   const [files, setFiles] = useState(() => {
     try {
       const savedFiles = localStorage.getItem("memo_files");
       if (savedFiles) {
         const parsed = JSON.parse(savedFiles);
-        // 🔴 關鍵修復：如果讀出來是空的，就不要用它！直接往下走去建立新檔案
+        // ✅ 修正點：必須確認它是陣列，而且「長度大於 0」才准用！
         if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed;
         }
       }
-      // 如果沒有新版檔案，檢查有沒有舊版草稿 (自動遷移)
+      // 如果沒有檔案(或是空的)，嘗試讀舊草稿
       const oldDraft = localStorage.getItem("memo_draft");
+      // ✅ 強制回傳預設檔案，確保 files 永遠有東西
       return [{ 
         id: Date.now(), 
         title: "未命名檔案", 
@@ -385,38 +387,40 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
         lastModified: new Date().toLocaleString() 
       }];
     } catch {
+      // 萬一發生靈異現象，最後一道防線
       return [{ id: Date.now(), title: "未命名檔案", content: "", lastModified: new Date().toLocaleString() }];
     }
   });
 
-  // 當前開啟的檔案 ID (這裡加了 ?. 防呆，雖然上面已經擋住了，但多一層保險)
+  // ★★★ 防護網 2：ID 狀態初始化 (加上 ?. 防呆) ★★★
+  // 萬一 files[0] 真的是空的，給一個新的 Date.now()，不要讓程式崩潰
   const [activeFileId, setActiveFileId] = useState(() => files[0]?.id || Date.now());
   const [showFileList, setShowFileList] = useState(false);
   
-  // AI 相關狀態
   const [res, setRes] = useState("");
   const [loading, setLoading] = useState(false);
   const textAreaRef = useRef(null);
 
-  // 取得當前檔案物件 (如果找不到 ID，就預設回傳第一個檔案，防止崩潰)
-  const activeFile = files.find(f => f.id === activeFileId) || files[0];
+  // ★★★ 防護網 3：取得當前檔案 (找不到就回傳第一個) ★★★
+  // 如果 files[0] 也不存在 (極低機率)，給一個假的空物件，防止渲染時報錯
+  const activeFile = files.find(f => f.id === activeFileId) || files[0] || { title: "Error", content: "" };
 
   // 自動存檔
   useEffect(() => {
-    localStorage.setItem("memo_files", JSON.stringify(files));
+    // 只有當 files 有內容時才存檔，避免把壞掉的狀態存進去
+    if (files.length > 0) {
+      localStorage.setItem("memo_files", JSON.stringify(files));
+    }
   }, [files]);
 
-  // 更新內容
   const updateContent = (newContent) => {
     setFiles(files.map(f => f.id === activeFileId ? { ...f, content: newContent, lastModified: new Date().toLocaleString() } : f));
   };
 
-  // 更新標題
   const updateTitle = (newTitle) => {
     setFiles(files.map(f => f.id === activeFileId ? { ...f, title: newTitle } : f));
   };
 
-  // 新增檔案
   const createNewFile = () => {
     const newFile = {
       id: Date.now(),
@@ -429,19 +433,16 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
     setShowFileList(false);
   };
 
-  // 刪除檔案
   const deleteFile = (e, id) => {
     e.stopPropagation();
     if (files.length <= 1) return alert("至少要保留一個檔案喔！");
     if (window.confirm("確定要刪除這個檔案嗎？無法復原喔。")) {
       const newFiles = files.filter(f => f.id !== id);
       setFiles(newFiles);
-      // 如果刪除的是當前檔案，切換到剩下的第一個
       if (activeFileId === id) setActiveFileId(newFiles[0].id);
     }
   };
 
-  // AI 功能
   const gen = async () => {
     if (!apiKey) return alert("請設定 API Key");
     if (!activeFile.content) return alert("內容不能為空");
@@ -505,6 +506,7 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
                  <span className="font-bold text-lg flex items-center gap-2"><FolderOpen size={20}/> 我的檔案</span>
                  <button onClick={() => setShowFileList(false)}><X size={20} className="opacity-50"/></button>
                </div>
+               
                <div className="flex-1 overflow-y-auto space-y-3 no-scrollbar">
                  {files.map(file => (
                    <div 
@@ -531,6 +533,7 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
                    </div>
                  ))}
                </div>
+
                <button onClick={createNewFile} className="w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl text-white font-bold shadow-lg flex items-center justify-center gap-2 active:scale-95">
                  <FilePlus size={18}/> 新增檔案
                </button>
@@ -553,12 +556,13 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
        </NeuBox>
 
        <div className="flex gap-4">
-         <NeuBox isDark={isDark} onClick={gen} className="flex-1 py-4 flex justify-center gap-2 font-bold text-purple-500 text-sm">{loading ? <span className="animate-pulse">✨ 寫作中...</span> : <><Zap size={18}/> 續寫 (聯網+長文)</>}</NeuBox>
+         <NeuBox isDark={isDark} onClick={gen} className="flex-1 py-4 flex justify-center gap-2 font-bold text-purple-500 text-sm">{loading ? <span className="animate-pulse">✨ 寫作中...</span> : <><Zap size={18}/> 續寫</>}</NeuBox>
          <NeuBox isDark={isDark} onClick={() => setShowChat(true)} className="flex-1 py-4 flex justify-center gap-2 font-bold text-pink-500 text-sm"><MessageCircle size={18}/> 對話</NeuBox>
        </div>
 
        <div className="flex flex-col gap-3">
           <div className="flex justify-between px-2 opacity-50"><span className="text-xs font-bold">AI 產出結果 (1500字+)</span>{res && <Copy size={14}/>}</div>
+          
           <div className="relative group">
              <NeuBox isDark={isDark} className="p-6 min-h-[250px] text-sm whitespace-pre-wrap leading-relaxed allow-select">
                 {res || <span className="opacity-20 text-xs flex items-center justify-center h-full">等待生成...</span>}
