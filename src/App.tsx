@@ -232,7 +232,10 @@ const ChatInterface = ({ onClose }) => {
     }
   });
   
-  const [messages, setMessages] = useState([{role: 'ai', text: `（看著你）我是 ${charConfig.name}。找我... 有事嗎？`}]);
+  const buildInitialMessages = (cfg) => ([
+  { role: 'ai', text: `（看著你）我是 ${cfg?.name || '神秘角色'}。` }
+]);
+  const [messages, setMessages] = useState(() => buildInitialMessages(charConfig));
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false); // 控制右側設定欄
@@ -244,6 +247,14 @@ const ChatInterface = ({ onClose }) => {
   
   // 自動儲存角色設定
   useEffect(() => { localStorage.setItem('chat_config', JSON.stringify(charConfig)); }, [charConfig]);
+
+// 角色名稱變動時：如果目前只有開場白，就同步更新開場白文字
+  useEffect(() => {
+  setMessages(prev => {
+    if (!Array.isArray(prev) || prev.length !== 1 || prev[0]?.role !== 'ai') return prev;
+    return buildInitialMessages(charConfig);
+  });
+}, [charConfig.name]);
 
   const sendMessage = async () => {
     if (!input.trim()) return;
@@ -257,15 +268,20 @@ const ChatInterface = ({ onClose }) => {
 
     try {
       // 🔴 關鍵升級：將角色設定注入 Prompt，讓 AI 知道它是誰
-      const prompt = `System: 你現在正在進行角色扮演 (Roleplay)。
-      你的角色名稱：${charConfig.name}
-      你的詳細設定/人設：${charConfig.setting}
-      
-      請完全沉浸在角色中，用該角色的口吻、語氣、性格與使用者對話。絕對不要跳出角色，也不要承認自己是 AI。
-      
-      User: ${userMsg}`;
-      
-      const reply = await callGemini(apiKey, prompt, false);
+      const history = [...messages, { role: 'user', text: userMsg }]
+  .slice(-12) // 控制長度，避免 token 爆炸
+  .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.text}`)
+  .join('\n');
+
+const prompt = [
+  `System: You are roleplaying as ${charConfig.name}.`,
+  `Character setting: ${charConfig.setting}`,
+  `Conversation (most recent last):`,
+  history,
+  `Assistant:`
+].join('\n');
+
+const reply = await callGemini(apiKey, prompt, false);
       setMessages(prev => [...prev, { role: 'ai', text: reply }]);
     } catch (e) { 
       setMessages(prev => [...prev, { role: 'ai', text: "😵 訊號中斷... (" + e.message + ")" }]);
@@ -367,8 +383,10 @@ const ChatInterface = ({ onClose }) => {
                     </div>
                 </div>
 
-                <button 
-                    onClick={() => { setMessages([]); setShowSidebar(false); }}
+                <button onClick={() => { 
+  setMessages(buildInitialMessages(charConfig)); 
+  setShowSidebar(false); 
+}}
                     className="w-full py-3 bg-red-500/10 text-red-400 font-bold rounded-xl border border-red-500/20 active:scale-95 flex items-center justify-center gap-2"
                 >
                     <Trash2 size={16}/> 重置對話紀錄
@@ -735,8 +753,9 @@ const PageGenerator = ({ isDark, apiKey }) => {
   const [resTool, setResTool] = useState("");
   
   // 工具輸入
-  const [toolInput1, setToolInput1] = useState("");
-  const [toolInput2, setToolInput2] = useState("");
+  const [senseScene, setSenseScene] = useState("");
+  const [bridgeFrom, setBridgeFrom] = useState("");
+  const [bridgeTo, setBridgeTo] = useState("");
   
   const [loading, setLoading] = useState("");
 
