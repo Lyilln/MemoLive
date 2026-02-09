@@ -1,35 +1,40 @@
 import React, { useState, useEffect, useRef } from 'react';
 // ★★★ 確保所有圖示引入完整，絕不白畫面 ★★★
-// 📌 1. 更新 Import (加入了 FolderOpen, FileText, FilePlus, ChevronRight)
 import { Sparkles, Zap, Edit3, User, List, Package, Plus, X, ChevronLeft, Share2, MoreHorizontal, Send, Copy, Settings, Dice5, Save, LayoutTemplate, Moon, Sun, Globe, MessageCircle, Monitor, Wand2, Eye, Footprints, Smile, PenTool, Trash2, Search, Download, Upload, FolderOpen, FileText, FilePlus, ChevronRight } from 'lucide-react';
 
-// --- 1. 更新樣式區塊 ---
+// --- 1. 更新樣式區塊 (含 100分 UI 優化) ---
 const styles = `
   @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-  .animate-fade-in { animation: fade-in 0.5s ease-out forwards; }
+  .animate-fade-in { animation: fade-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
   
   @keyframes pulse-glow { 0%, 100% { opacity: 1; transform: scale(1); filter: drop-shadow(0 0 10px rgba(168,85,247,0.4)); } 50% { opacity: 0.7; transform: scale(0.95); filter: drop-shadow(0 0 20px rgba(168,85,247,0.8)); } }
-  .animate-pulse-glow { animation: pulse-glow 2s infinite ease-in-out; }
+  .animate-pulse-glow { animation: pulse-glow 2.5s infinite ease-in-out; }
 
   @keyframes splash-out { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-20px); pointer-events: none; } }
   .animate-splash-out { animation: splash-out 0.6s ease-in-out forwards; }
 
+  /* 禁止橡皮筋回彈 & 點擊高亮 */
+  body { overscroll-behavior-y: none; -webkit-tap-highlight-color: transparent; }
+
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-  /* ★★★ 新增：允許選取文字的樣式 ★★★ */
   .allow-select { user-select: text; -webkit-user-select: text; }
+  
+  /* 適配 iPhone 瀏海與 Home Bar */
+  .safe-top { padding-top: env(safe-area-inset-top); }
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
 `;
 
 // --- 核心元件：新擬態盒子 (NeuBox) ---
 const NeuBox = ({ children, className = '', pressed = false, onClick, isDark, active = false, border = false }) => {
   const darkShadow = active || pressed 
-    ? 'shadow-[inset_5px_5px_10px_#161722,inset_-5px_-5px_10px_#2a2c40] bg-[#202130]' 
-    : 'shadow-[6px_6px_12px_#151620,-6px_-6px_12px_#2b2c40] bg-[#202130]';
+    ? 'shadow-[inset_4px_4px_8px_#161722,inset_-4px_-4px_8px_#2a2c40] bg-[#202130]' 
+    : 'shadow-[5px_5px_10px_#151620,-5px_-5px_10px_#2b2c40] bg-[#202130]';
 
   const lightShadow = active || pressed
-    ? 'shadow-[inset_6px_6px_12px_#b8b9be,inset_-6px_-6px_12px_#ffffff] bg-[#E0E5EC]'
-    : 'shadow-[8px_8px_16px_#b8b9be,-8px_-8px_16px_#ffffff] bg-[#E0E5EC]';
+    ? 'shadow-[inset_5px_5px_10px_#b8b9be,inset_-5px_-5px_10px_#ffffff] bg-[#E0E5EC]'
+    : 'shadow-[6px_6px_12px_#b8b9be,-6px_-6px_12px_#ffffff] bg-[#E0E5EC]';
 
   const activeText = active ? 'text-purple-500' : (isDark ? 'text-gray-400' : 'text-gray-600');
   const borderStyle = border ? (isDark ? 'border border-white/5' : 'border border-white/40') : '';
@@ -48,22 +53,19 @@ const NeuBox = ({ children, className = '', pressed = false, onClick, isDark, ac
   );
 };
 
-// --- 導航列 ---
+// --- 導航列 (打字自動隱藏) ---
 const Navigation = ({ activeTab, setActiveTab, isDark }) => {
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
-    // 偵測是否正在輸入
     const handleFocus = (e) => {
       const tag = e.target.tagName;
-      // 如果焦點在 Input 或 Textarea，就隱藏導航列
       if (tag === 'INPUT' || tag === 'TEXTAREA') {
         setIsVisible(false);
       }
     };
 
     const handleBlur = (e) => {
-      // 失去焦點時（收起鍵盤），稍微延遲一下再顯示，以免切換輸入框時閃爍
       setTimeout(() => {
         const tag = document.activeElement?.tagName;
         if (tag !== 'INPUT' && tag !== 'TEXTAREA') {
@@ -72,7 +74,6 @@ const Navigation = ({ activeTab, setActiveTab, isDark }) => {
       }, 100);
     };
 
-    // 使用 focusin / focusout 才能捕捉冒泡事件
     window.addEventListener('focusin', handleFocus);
     window.addEventListener('focusout', handleBlur);
 
@@ -90,7 +91,6 @@ const Navigation = ({ activeTab, setActiveTab, isDark }) => {
         ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-[200%] opacity-0'} 
       `}
     >
-      {/* 加上 translate-y-[200%] 讓它往下潛入海底，而不是消失，這樣動畫比較順 */}
       <div className={`flex justify-between items-center px-6 py-4 rounded-[28px] shadow-2xl backdrop-blur-md ${isDark ? 'bg-[#202130]/90 shadow-black/40' : 'bg-[#E0E5EC]/90 shadow-gray-400/40'}`}>
         <NavIcon icon={Edit3} label="續寫" active={activeTab === 'memo'} onClick={() => setActiveTab('memo')} isDark={isDark} />
         <NavIcon icon={Sparkles} label="生成器" active={activeTab === 'generator'} onClick={() => setActiveTab('generator')} isDark={isDark} />
@@ -101,7 +101,34 @@ const Navigation = ({ activeTab, setActiveTab, isDark }) => {
   );
 };
 
-// --- 對話介面 (真實串接 AI + 自動捲動) ---
+const NavIcon = ({ icon: Icon, label, active, onClick, isDark }) => (
+  <div onClick={onClick} className="flex flex-col items-center gap-1.5 cursor-pointer group">
+    <NeuBox isDark={isDark} active={active} className={`w-12 h-12 flex items-center justify-center rounded-[18px] transition-all duration-300`}>
+      <Icon size={22} strokeWidth={2.5} className={active ? 'drop-shadow-[0_0_5px_rgba(168,85,247,0.5)]' : ''} />
+    </NeuBox>
+    <span className={`text-[10px] font-bold tracking-wide transition-colors ${active ? 'text-purple-500' : 'text-transparent scale-0 h-0'}`}>{label}</span>
+  </div>
+);
+
+// --- API 核心 (保留指定版本) ---
+const callGemini = async (apiKey, prompt, useWeb = false) => {
+  const tools = useWeb ? [{ googleSearch: {} }] : [];
+  // 保留你指定的 gemini-2.5-flash-preview-09-2025
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, { 
+    method: "POST", 
+    headers: { "Content-Type": "application/json" }, 
+    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], tools: tools }) 
+  });
+  const data = await response.json();
+  if (data.error) throw new Error(data.error.message);
+  
+  const candidate = data.candidates?.[0];
+  if (!candidate) return "生成失敗，請重試。";
+  const textPart = candidate.content?.parts?.find(p => p.text);
+  return textPart ? textPart.text : "生成成功 (內容包含非文字資訊)";
+};
+
+// --- 對話介面 (Sticky Input + Safe Area) ---
 const ChatInterface = ({ onClose }) => {
   const [messages, setMessages] = useState([{role: 'ai', text: '（探頭）我是你的角色靈魂... 你想跟我聊什麼劇情？'}]);
   const [input, setInput] = useState("");
@@ -145,7 +172,6 @@ const ChatInterface = ({ onClose }) => {
          {loading && <div className="text-xs text-gray-500 animate-pulse ml-2 flex items-center gap-1"><Sparkles size={12}/> 角色正在輸入...</div>}
          <div ref={bottomRef} />
       </div>
-      {/* 🔴 這裡加回了 sticky bottom-0 和 safe-bottom，打字體驗才會好！ */}
       <div className="p-4 pb-10 bg-[#1a1b23] sticky bottom-0 z-20 border-t border-white/5 safe-bottom">
          <div className="bg-[#252630] rounded-[24px] p-1.5 pl-5 flex items-center shadow-lg border border-white/5">
             <input className="flex-1 bg-transparent outline-none text-white text-sm h-10 placeholder-gray-500" placeholder="輸入你想說的話..." value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendMessage()}/>
@@ -154,23 +180,6 @@ const ChatInterface = ({ onClose }) => {
       </div>
     </div>
   );
-};
-
-// --- API 核心 ---
-const callGemini = async (apiKey, prompt, useWeb = false) => {
-  const tools = useWeb ? [{ googleSearch: {} }] : [];
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, { 
-    method: "POST", 
-    headers: { "Content-Type": "application/json" }, 
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], tools: tools }) 
-  });
-  const data = await response.json();
-  if (data.error) throw new Error(data.error.message);
-  
-  const candidate = data.candidates?.[0];
-  if (!candidate) return "生成失敗，請重試。";
-  const textPart = candidate.content?.parts?.find(p => p.text);
-  return textPart ? textPart.text : "生成成功 (內容包含非文字資訊)";
 };
 
 // --- 拉霸機 ---
@@ -224,7 +233,7 @@ const SlotMachine = ({ isDark, apiKey, onResult }) => {
   );
 };
 
-// --- 頁面: 靈感庫 (含搜尋功能 + 編輯 + 刪除確認) ---
+// --- 頁面: 靈感庫 (含搜尋、編輯、刪除確認) ---
 const PageVault = ({ isDark, apiKey }) => {
   const [tab, setTab] = useState('snippet'); 
   const [items, setItems] = useState(() => { try { return JSON.parse(localStorage.getItem('memo_vault') || '[]'); } catch { return []; } }); 
@@ -268,7 +277,7 @@ const PageVault = ({ isDark, apiKey }) => {
   // ★★★ 修改：過濾邏輯加入搜尋 ★★★
   const filteredItems = items.filter(i => {
     const matchTab = i.type === tab;
-    const matchSearch = i.content.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchSearch = (i.content || "").toLowerCase().includes(searchTerm.toLowerCase());
     return matchTab && matchSearch;
   });
 
@@ -294,7 +303,6 @@ const PageVault = ({ isDark, apiKey }) => {
 
        <SlotMachine isDark={isDark} apiKey={apiKey} onResult={setSlotResult} />
        
-       {/* ... (中間 slotResult 和 TabBtn 保持不變，省略以節省篇幅，請保留原代碼) ... */}
        {slotResult && ( 
          <div className="animate-fade-in mb-2">
             <div className="flex justify-between items-center px-2 mb-2 opacity-70"><span className="text-xs font-bold text-purple-400">🎉 生成結果</span></div>
@@ -326,13 +334,11 @@ const PageVault = ({ isDark, apiKey }) => {
        
        <div className={`flex-grow overflow-hidden rounded-[24px] p-1 ${isDark ? 'bg-[#161722]/50 shadow-[inset_2px_2px_6px_#0b0c15,inset_-2px_-2px_6px_#2a2c38]' : 'bg-[#D1D9E6] shadow-[inset_2px_2px_6px_#b8b9be,inset_-2px_-2px_6px_#ffffff]'}`}>
          <div className="h-full overflow-y-auto p-3 space-y-3 no-scrollbar">
-            {/* 搜尋結果為空的顯示 */}
             {filteredItems.length === 0 && !isAdding && (
                 <div className="h-full flex flex-col items-center justify-center opacity-30 gap-2">
                     {searchTerm ? <span className="text-xs">找不到 "{searchTerm}"</span> : <><Package size={40} strokeWidth={1}/><span className="text-xs">這裡還沒有資料...</span></>}
                 </div>
             )}
-            {/* ... (下面的 items map 保持不變，省略) ... */}
             {filteredItems.map(item => (
               <NeuBox key={item.id} isDark={isDark} className="p-4 relative group animate-fade-in border border-white/5">
                 {editingId === item.id ? (
@@ -363,25 +369,26 @@ const PageVault = ({ isDark, apiKey }) => {
   );
 };
 
-// --- 頁面: 續寫 (升級版：多檔案管理 + AI 續寫) ---
+// --- 頁面: 續寫 (終極防護修復版：已加入三道防護網) ---
+const PageMemo = ({ isDark, apiKey, setShowChat }) => {
+  // ★★★ 防護網 1：初始化資料庫 (確保永遠不會是空陣列，且自動補齊舊資料的 lastModified) ★★★
   const [files, setFiles] = useState(() => {
     try {
       const savedFiles = localStorage.getItem("memo_files");
       if (savedFiles) {
         const parsed = JSON.parse(savedFiles);
-        // 防護 1: 確保是有效陣列
+        // 如果是有效陣列且有內容，檢查是否有缺失欄位 (例如 lastModified)
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // 防護 2: 遍歷所有檔案，強制補齊缺失欄位 (這就是解決黑屏的關鍵)
           return parsed.map(f => ({
-            ...f, // 保留原有的 id, title, content
+            ...f,
             title: f.title || "未命名檔案",
             content: f.content || "",
-            // 🔴 這裡！如果舊檔案沒有時間，自動補上現在時間，防止 .split() 崩潰
-            lastModified: f.lastModified || new Date().toLocaleString() 
+            // 🔴 關鍵修復：如果舊檔案沒有 lastModified，自動補上現在時間，防止 .split() 崩潰
+            lastModified: f.lastModified || new Date().toLocaleString()
           }));
         }
       }
-      // 防護 3: 如果完全沒檔案，讀取舊草稿或建立新的
+      // 如果沒有檔案或格式錯誤，嘗試讀取舊草稿
       const oldDraft = localStorage.getItem("memo_draft");
       return [{ 
         id: Date.now(), 
@@ -390,38 +397,11 @@ const PageVault = ({ isDark, apiKey }) => {
         lastModified: new Date().toLocaleString() 
       }];
     } catch {
-      // 防護 4: 極端狀況回傳預設值
       return [{ id: Date.now(), title: "未命名檔案", content: "", lastModified: new Date().toLocaleString() }];
     }
   });
 
-const PageMemo = ({ isDark, apiKey, setShowChat }) => {
-  // ★★★ 防護網 1：初始化資料庫 (確保永遠不會是空陣列) ★★★
-  const [files, setFiles] = useState(() => {
-    try {
-      const savedFiles = localStorage.getItem("memo_files");
-      if (savedFiles) {
-        const parsed = JSON.parse(savedFiles);
-        // ✅ 修正重點：一定要檢查長度！如果是空的 []，就視為無效，往下走去建立預設檔案
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
-      // 如果沒有檔案或是空的，建立一個預設檔案
-      const oldDraft = localStorage.getItem("memo_draft");
-      return [{ 
-        id: Date.now(), 
-        title: "未命名檔案", 
-        content: oldDraft || "", 
-        lastModified: new Date().toLocaleString() 
-      }];
-    } catch {
-      // 萬一發生任何錯誤，回傳一個全新的預設檔案
-      return [{ id: Date.now(), title: "未命名檔案", content: "", lastModified: new Date().toLocaleString() }];
-    }
-  });
-
-  // ★★★ 防護網 2：ID 初始值 (加上 ?. 防呆，防止 files[0] 為空時崩潰) ★★★
+  // ★★★ 防護網 2：ID 初始值 (加上 ?. 防呆) ★★★
   const [activeFileId, setActiveFileId] = useState(() => files[0]?.id || Date.now());
   const [showFileList, setShowFileList] = useState(false);
   
@@ -429,12 +409,11 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
   const [loading, setLoading] = useState(false);
   const textAreaRef = useRef(null);
 
-  // ★★★ 防護網 3：取得當前檔案 (找不到時回傳第一個，再找不到回傳空物件，防止渲染崩潰) ★★★
-  const activeFile = files.find(f => f.id === activeFileId) || files[0] || { title: "", content: "", lastModified: "" };
+  // ★★★ 防護網 3：取得 activeFile 時，如果找不到，回傳一個安全的空物件 ★★★
+  const activeFile = files.find(f => f.id === activeFileId) || files[0] || { title: "Error", content: "", lastModified: new Date().toLocaleString() };
 
   // 自動存檔
   useEffect(() => {
-    // 只有當 files 有東西時才存檔，避免存入空陣列
     if (files.length > 0) {
       localStorage.setItem("memo_files", JSON.stringify(files));
     }
@@ -547,11 +526,9 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
                    >
                      <div className="flex items-center gap-3 overflow-hidden">
                        <FileText size={18} className={activeFileId === file.id ? 'opacity-100' : 'opacity-50'}/>
-                      {/* 防護 5: 顯示時再次防呆，防止 undefined 導致 split 報錯 */}
-                       <span className="text-[10px] opacity-60">
-                        {(file.lastModified || "").split(' ')[0]}
-                        </span>
-                         {/* 這裡加了防護，防止 lastModified 不存在時報錯 */}
+                       <div className="flex flex-col truncate">
+                         <span className="text-sm font-bold truncate">{file.title}</span>
+                         {/* ★★★ 這裡也加了防呆 ★★★ */}
                          <span className="text-[10px] opacity-60">{(file.lastModified || "").split(' ')[0]}</span>
                        </div>
                      </div>
@@ -607,7 +584,6 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
     </div>
   );
 };
-
 
 // --- 頁面: 生成器 (包含：靈感生成(舊) + 潤色工具(新)) ---
 const PageGenerator = ({ isDark, apiKey }) => {
@@ -879,7 +855,7 @@ const App = () => {
   if (showChat) return <ChatInterface onClose={() => setShowChat(false)} />;
 
   return (
-    <div className={`min-h-screen transition-colors duration-300 font-sans relative overflow-x-hidden ${isDark ? 'bg-[#202130] text-gray-200' : 'bg-[#E0E5EC] text-[#5b5d7e]'}`}>
+    <div className={`min-h-screen transition-colors duration-300 font-sans relative overflow-x-hidden safe-top safe-bottom ${isDark ? 'bg-[#202130] text-gray-200' : 'bg-[#E0E5EC] text-[#5b5d7e]'}`}>
       <style>{styles}</style>
       <div className="pt-12 pb-4 text-center px-4"><h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-indigo-400 tracking-tight">MemoLive</h1><p className="text-[10px] font-bold opacity-30 tracking-[0.3em] mt-1">ULTIMATE</p></div>
       <div className="max-w-md mx-auto h-full px-5">
