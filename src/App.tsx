@@ -1,12 +1,42 @@
 import React, { useState, useEffect, useRef } from 'react';
 // ★★★ 確保所有圖示引入完整，絕不白畫面 ★★★
 import { 
-  Sparkles, Zap, Edit3, User, List, Package, Plus, X, 
-  ChevronLeft, Share2, MoreHorizontal, Send, Copy, Settings, 
-  Dice5, Save, LayoutTemplate, Moon, Sun, Globe, MessageCircle, 
-  Monitor, Wand2, Eye, Footprints, Smile, PenTool, Trash2, 
-  Search, Download, Upload, FolderOpen, FileText, FilePlus, 
-  ChevronRight, Menu 
+  Sparkles, 
+  Zap, 
+  Edit3, 
+  User, 
+  List, 
+  Package, 
+  Plus, 
+  X, 
+  ChevronLeft, 
+  Share2, 
+  MoreHorizontal, 
+  Send, 
+  Copy, 
+  Settings, 
+  Dice5, 
+  Save, 
+  LayoutTemplate, 
+  Moon, 
+  Sun, 
+  Globe, 
+  MessageCircle, 
+  Monitor, 
+  Wand2, 
+  Eye, 
+  Footprints, 
+  Smile, 
+  PenTool, 
+  Trash2, 
+  Search, 
+  Download, 
+  Upload, 
+  FolderOpen, 
+  FileText, 
+  FilePlus, 
+  ChevronRight, 
+  Menu 
 } from 'lucide-react';
 
 // --- 1. 全局樣式區塊 (含動畫與 iPhone 適配) ---
@@ -76,22 +106,30 @@ const styles = `
 
 // --- 2. 核心元件：新擬態盒子 (NeuBox) ---
 const NeuBox = ({ children, className = '', pressed = false, onClick, isDark, active = false, border = false }) => {
+  // 深色模式陰影邏輯
   const darkShadow = active || pressed 
     ? 'shadow-[inset_4px_4px_8px_#161722,inset_-4px_-4px_8px_#2a2c40] bg-[#202130]' 
     : 'shadow-[5px_5px_10px_#151620,-5px_-5px_10px_#2b2c40] bg-[#202130]';
 
+  // 淺色模式陰影邏輯
   const lightShadow = active || pressed
     ? 'shadow-[inset_5px_5px_10px_#b8b9be,inset_-5px_-5px_10px_#ffffff] bg-[#E0E5EC]'
     : 'shadow-[6px_6px_12px_#b8b9be,-6px_-6px_12px_#ffffff] bg-[#E0E5EC]';
 
+  // 文字顏色邏輯
   const activeText = active ? 'text-purple-500' : (isDark ? 'text-gray-400' : 'text-gray-600');
+  
+  // 邊框邏輯
   const borderStyle = border ? (isDark ? 'border border-white/5' : 'border border-white/40') : '';
 
   return (
     <div 
       onClick={onClick} 
       className={`
-        ${className} ${activeText} ${isDark ? darkShadow : lightShadow} ${borderStyle}
+        ${className} 
+        ${activeText} 
+        ${isDark ? darkShadow : lightShadow} 
+        ${borderStyle}
         transition-all duration-300 ease-out rounded-[24px]
         ${onClick ? 'cursor-pointer active:scale-[0.98]' : ''}
       `}
@@ -479,7 +517,7 @@ const PageVault = ({ isDark, apiKey }) => {
     <div className="space-y-4 animate-fade-in pb-32 h-full flex flex-col">
        <div className="flex items-center gap-2 opacity-60 px-2 mt-2"><Package size={20}/> <h2 className="text-xl font-bold">靈感庫</h2></div>
        
-       {/* ★★★ 搜尋列 ★★★ */}
+       {/* ★★★ 新增：搜尋列 ★★★ */}
        <div className="px-1">
          <div className={`flex items-center px-3 py-2 rounded-xl border ${isDark ? 'bg-black/20 border-white/10' : 'bg-white/40 border-black/5'}`}>
             <Search size={14} className="opacity-50 mr-2"/>
@@ -526,11 +564,13 @@ const PageVault = ({ isDark, apiKey }) => {
        
        <div className={`flex-grow overflow-hidden rounded-[24px] p-1 ${isDark ? 'bg-[#161722]/50 shadow-[inset_2px_2px_6px_#0b0c15,inset_-2px_-2px_6px_#2a2c38]' : 'bg-[#D1D9E6] shadow-[inset_2px_2px_6px_#b8b9be,inset_-2px_-2px_6px_#ffffff]'}`}>
          <div className="h-full overflow-y-auto p-3 space-y-3 no-scrollbar">
+            {/* 搜尋結果為空的顯示 */}
             {filteredItems.length === 0 && !isAdding && (
                 <div className="h-full flex flex-col items-center justify-center opacity-30 gap-2">
                     {searchTerm ? <span className="text-xs">找不到 "{searchTerm}"</span> : <><Package size={40} strokeWidth={1}/><span className="text-xs">這裡還沒有資料...</span></>}
                 </div>
             )}
+            {/* ... (下面的 items map 保持不變，省略) ... */}
             {filteredItems.map(item => (
               <NeuBox key={item.id} isDark={isDark} className="p-4 relative group animate-fade-in border border-white/5">
                 {editingId === item.id ? (
@@ -583,14 +623,14 @@ const PageMemo = ({ isDark, apiKey, setShowChat, files, setFiles, activeFileId, 
     if (!activeFile.content) return alert("內容不能為空");
     setLoading(true);
     try {
-      // 🔴 這裡就是你的要求：禁止廢話、強制搜尋、禁止OOC、平行時空
+      // 🔴 暴力修正 Prompt：斬斷廢話 + 強制搜尋 + 禁止 OOC
       const prompt = `
         角色：頂尖同人小說家。
         任務：續寫這篇小說。
         
         【極重要指令 - 絕對遵守】：
         1. ⛔ **絕對禁止輸出前言/後語**：直接從小說內文開始寫，不要說「好的」、「以下是續寫」等廢話。我只要內文。
-        2. 🔍 **強制聯網考據**：請仔細偵測原文中的人名與團體。如果是現實存在的偶像(如 TripleS, LOONA, ARTMS 等)，**必須使用 Google Search 驗證**成員名單、正確設定與現實背景。**嚴禁**捏造假團名(如 S*TARS)或錯誤設定，除非原文已明確建立完全架空的世界觀。
+        2. 🔍 **強制聯網考據**：請仔細偵測原文中的人名與團體。如果是現實存在的偶像(如 TripleS, LOONA, ARTMS 等)，**必須使用 Google Search 驗證**成員名單、正確設定與現實背景。**嚴禁**捏造假團名或錯誤設定，除非原文已明確建立完全架空的世界觀。
         3. 🚫 **OOC 禁止**：嚴格遵守人物原本的說話語氣與性格，捕捉人物神韻。
         4. 🌌 **世界觀偵測**：如果原文提及「平行時空」或特定設定，請嚴格遵循該設定進行續寫。
         5. 📏 **長度**：請寫出 1500 字以上的高質量內容。
@@ -610,7 +650,7 @@ const PageMemo = ({ isDark, apiKey, setShowChat, files, setFiles, activeFileId, 
     const end = textarea.selectionEnd;
     const selectedText = activeFile.content.substring(start, end);
 
-    if (!selectedText || selectedText.trim().length === 0) return alert("請先選取您想要擴寫的句子！");
+    if (!selectedText) return alert("請選取文字");
     if (!apiKey) return alert("請設定 API Key");
 
     setLoading(true);
@@ -633,6 +673,7 @@ const PageMemo = ({ isDark, apiKey, setShowChat, files, setFiles, activeFileId, 
     <div className="space-y-5 animate-fade-in pb-32 relative">
        {/* 標題與檔案切換區 */}
        <div className="flex items-center gap-3 mt-2">
+          {/* 因為已經有全域側邊欄，這裡的按鈕可以拿掉，或是作為快捷鍵 */}
           <div className="flex-1">
             <input 
               className="w-full bg-transparent text-xl font-bold outline-none placeholder-opacity-50 text-purple-400" 
@@ -680,7 +721,7 @@ const PageMemo = ({ isDark, apiKey, setShowChat, files, setFiles, activeFileId, 
   );
 };
 
-// --- 9. 生成器頁面 ---
+// --- 9. 生成器頁面 (包含：靈感生成(舊) + 潤色工具(新)) ---
 const PageGenerator = ({ isDark, apiKey }) => {
   const [subTab, setSubTab] = useState('generate');
   const [config, setConfig] = useState({ genre: "現代言情", tone: "甜寵", world: "", cp: "", trope: "" });
@@ -817,7 +858,7 @@ const PageMe = ({ isDark, apiKey, setApiKey, themeMode, setThemeMode, files }) =
       memo_vault: localStorage.getItem('memo_vault'),
       gemini_key: localStorage.getItem('gemini_key'),
       theme_mode: localStorage.getItem('theme_mode'),
-      memo_files: JSON.stringify(files) // 使用 App 傳來的最新 files
+      memo_files: JSON.stringify(files) // 使用傳入的最新 files 狀態
     };
     const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -870,10 +911,7 @@ const PageMe = ({ isDark, apiKey, setApiKey, themeMode, setThemeMode, files }) =
           <div className="space-y-2">
              <span className="text-xs font-bold opacity-50 ml-2">資料管理 (換手機必用)</span>
              <div className="flex gap-3">
-                <NeuBox isDark={isDark} onClick={exportData} className="flex-1 py-4 flex flex-col items-center justify-center gap-2 cursor-pointer active:scale-95">
-                    <Download size={20} className="text-blue-500"/>
-                    <span className="text-xs font-bold">備份資料</span>
-                </NeuBox>
+                <NeuBox isDark={isDark} onClick={exportData} className="flex-1 py-4 flex flex-col items-center justify-center gap-2 cursor-pointer active:scale-95"><Download size={20} className="text-blue-500"/><span className="text-xs font-bold">備份資料</span></NeuBox>
                 <label className="flex-1 relative">
                     <input type="file" accept=".json" onChange={importData} className="hidden" />
                     <NeuBox isDark={isDark} className="h-full py-4 flex flex-col items-center justify-center gap-2 cursor-pointer active:scale-95">
@@ -908,14 +946,20 @@ const App = () => {
   const [showChat, setShowChat] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false); // ★★★ 側邊欄狀態提升 ★★★
 
-  // ★★★ 全域防護：檔案管理狀態 (提升到 App 層，防止黑屏) ★★★
+  // ★★★ 全域防護：檔案管理狀態 (修復黑屏) ★★★
   const [files, setFiles] = useState(() => {
     try {
       const saved = localStorage.getItem("memo_files");
       const parsed = saved ? JSON.parse(saved) : [];
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // 自動補全 lastModified 防黑屏
-        return parsed.map(f => ({ ...f, lastModified: f.lastModified || new Date().toLocaleString() }));
+        // ★★★ 關鍵修復：過濾掉 null 或壞掉的資料，並自動補全欄位 ★★★
+        return parsed.filter(f => f).map(f => ({ 
+            ...f, 
+            id: f.id || Date.now(),
+            title: f.title || "未命名檔案",
+            content: f.content || "",
+            lastModified: f.lastModified || new Date().toLocaleString() 
+        }));
       }
       return [{ id: Date.now(), title: "未命名檔案", content: "", lastModified: new Date().toLocaleString() }];
     } catch {
@@ -928,16 +972,9 @@ const App = () => {
   useEffect(() => { if(files.length > 0) localStorage.setItem("memo_files", JSON.stringify(files)); }, [files]);
 
   useEffect(() => {
-    const applyTheme = () => {
-      const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const isDarkMode = themeMode === 'system' ? systemDark : themeMode === 'dark';
-      setIsDark(isDarkMode);
-    };
-    applyTheme();
-    localStorage.setItem("theme_mode", themeMode);
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    mediaQuery.addEventListener('change', applyTheme);
-    return () => mediaQuery.removeEventListener('change', applyTheme);
+    const applyTheme = () => { const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches; setIsDark(themeMode === 'system' ? systemDark : themeMode === 'dark'); };
+    applyTheme(); localStorage.setItem("theme_mode", themeMode);
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)'); mediaQuery.addEventListener('change', applyTheme); return () => mediaQuery.removeEventListener('change', applyTheme);
   }, [themeMode]);
 
   // 新增檔案邏輯
