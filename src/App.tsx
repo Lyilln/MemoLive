@@ -20,7 +20,16 @@ const styles = `
     animation: fade-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; 
   }
   
-  /* 側邊欄滑入動畫 */
+  /* 左側滑入動畫 (檔案櫃) */
+  @keyframes slide-in-left { 
+    from { transform: translateX(-100%); } 
+    to { transform: translateX(0); } 
+  }
+  .animate-slide-in-left { 
+    animation: slide-in-left 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; 
+  }
+
+  /* 右側滑入動畫 (角色設定) */
   @keyframes slide-in-right { 
     from { transform: translateX(100%); } 
     to { transform: translateX(0); } 
@@ -36,15 +45,6 @@ const styles = `
   }
   .animate-pulse-glow { 
     animation: pulse-glow 2.5s infinite ease-in-out; 
-  }
-
-  /* 開場動畫退場 */
-  @keyframes splash-out { 
-    from { opacity: 1; transform: translateY(0); } 
-    to { opacity: 0; transform: translateY(-20px); pointer-events: none; } 
-  }
-  .animate-splash-out { 
-    animation: splash-out 0.6s ease-in-out forwards; 
   }
 
   /* 禁止橡皮筋回彈 & 點擊高亮 (App 質感關鍵) */
@@ -92,8 +92,8 @@ const NeuBox = ({ children, className = '', pressed = false, onClick, isDark, ac
   );
 };
 
-// --- 導航列 (打字時自動隱藏) ---
-const Navigation = ({ activeTab, setActiveTab, isDark }) => {
+// --- 導航列 (打字或開側邊欄時自動隱藏) ---
+const Navigation = ({ activeTab, setActiveTab, isDark, forceHide }) => {
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
@@ -124,12 +124,15 @@ const Navigation = ({ activeTab, setActiveTab, isDark }) => {
     };
   }, []);
 
+  // 如果 forceHide (側邊欄打開) 為 true，強制隱藏
+  const shouldShow = isVisible && !forceHide;
+
   return (
     <div 
       className={`
         fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[90%] max-w-[380px] safe-bottom
         transition-all duration-500 ease-in-out
-        ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-[200%] opacity-0'} 
+        ${shouldShow ? 'translate-y-0 opacity-100' : 'translate-y-[200%] opacity-0'} 
       `}
     >
       <div className={`flex justify-between items-center px-6 py-4 rounded-[28px] shadow-2xl backdrop-blur-md ${isDark ? 'bg-[#202130]/90 shadow-black/40' : 'bg-[#E0E5EC]/90 shadow-gray-400/40'}`}>
@@ -175,14 +178,17 @@ const callGemini = async (apiKey, prompt, useWeb = false) => {
 const ChatInterface = ({ onClose }) => {
   // 角色設定狀態 (預設值)
   const [charConfig, setCharConfig] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('chat_config') || '{"name":"神秘角色","setting":"你是一個神祕的小說角色，語氣要稍微高冷但帶點關心。"}'); } 
-    catch { return {name:"神秘角色", setting:"你是一個神祕的小說角色。"}; }
+    try { 
+        return JSON.parse(localStorage.getItem('chat_config') || '{"name":"神秘角色","setting":"你是一個神祕的小說角色，語氣要稍微高冷但帶點關心。"}'); 
+    } catch { 
+        return {name:"神秘角色", setting:"你是一個神祕的小說角色。"}; 
+    }
   });
   
   const [messages, setMessages] = useState([{role: 'ai', text: `（看著你）我是 ${charConfig.name}。找我... 有事嗎？`}]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showSidebar, setShowSidebar] = useState(false); // 控制側邊欄顯示
+  const [showSidebar, setShowSidebar] = useState(false); // 控制聊天設定側邊欄
   const bottomRef = useRef(null);
   const apiKey = localStorage.getItem("gemini_key");
 
@@ -403,22 +409,24 @@ const SlotMachine = ({ isDark, apiKey, onResult }) => {
           {slots.map((text, i) => (<NeuBox key={i} isDark={isDark} pressed className={`flex-1 h-16 flex items-center justify-center text-xs font-bold text-center px-1 ${spinning ? 'opacity-50 blur-[1px]' : 'text-purple-500'}`}>{text}</NeuBox>))}
        </div>
        <NeuBox isDark={isDark} onClick={handleSpin} className={`w-full py-4 flex items-center justify-center gap-2 font-bold text-sm ${spinning ? 'opacity-50' : 'text-purple-500'}`}>
-          {spinning ? "轉動中..." : loading ? <span className="animate-pulse">✨ AI 正在燃燒腦細胞...</span> : <><Dice5 size={20}/> 隨機拉霸 + 生成</>}
+          {spinning ? "轉動中..." : loading ? "AI 正在寫作..." : <><Dice5 size={20}/> 隨機拉霸 + 生成</>}
        </NeuBox>
     </NeuBox>
   );
 };
 
-// --- 頁面: 靈感庫 (搜尋、編輯、刪除) ---
+// --- 頁面: 靈感庫 (含搜尋、編輯、刪除確認) ---
 const PageVault = ({ isDark, apiKey }) => {
   const [tab, setTab] = useState('snippet'); 
-  const [items, setItems] = useState(() => { try { const data = JSON.parse(localStorage.getItem('memo_vault') || '[]'); return Array.isArray(data) ? data : []; } catch { return []; } }); 
+  const [items, setItems] = useState(() => { try { return JSON.parse(localStorage.getItem('memo_vault') || '[]'); } catch { return []; } }); 
   const [newItemContent, setNewItemContent] = useState(''); 
   const [isAdding, setIsAdding] = useState(false); 
   const [slotResult, setSlotResult] = useState("");
   const [editingId, setEditingId] = useState(null); 
   const [editContent, setEditContent] = useState(""); 
-  const [searchTerm, setSearchTerm] = useState(""); // 搜尋關鍵字
+  
+  // ★★★ 新增：搜尋關鍵字狀態 ★★★
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => { localStorage.setItem('memo_vault', JSON.stringify(items)); }, [items]); 
   
@@ -448,7 +456,7 @@ const PageVault = ({ isDark, apiKey }) => {
       }
   };
   
-  // 搜尋過濾邏輯
+  // ★★★ 修改：過濾邏輯加入搜尋 ★★★
   const filteredItems = items.filter(i => {
     const matchTab = i.type === tab;
     // 防呆：確保 i.content 存在
@@ -462,7 +470,7 @@ const PageVault = ({ isDark, apiKey }) => {
     <div className="space-y-4 animate-fade-in pb-32 h-full flex flex-col">
        <div className="flex items-center gap-2 opacity-60 px-2 mt-2"><Package size={20}/> <h2 className="text-xl font-bold">靈感庫</h2></div>
        
-       {/* 搜尋列 */}
+       {/* ★★★ 新增：搜尋列 ★★★ */}
        <div className="px-1">
          <div className={`flex items-center px-3 py-2 rounded-xl border ${isDark ? 'bg-black/20 border-white/10' : 'bg-white/40 border-black/5'}`}>
             <Search size={14} className="opacity-50 mr-2"/>
@@ -545,54 +553,13 @@ const PageVault = ({ isDark, apiKey }) => {
 };
 
 // --- 頁面: 續寫 (終極防護修復版：三道防護網) ---
-const PageMemo = ({ isDark, apiKey, setShowChat }) => {
-  // ★★★ 防護網 1：初始化資料庫 (確保永遠不會是空陣列，且自動補齊舊資料的 lastModified) ★★★
-  const [files, setFiles] = useState(() => {
-    try {
-      const savedFiles = localStorage.getItem("memo_files");
-      if (savedFiles) {
-        const parsed = JSON.parse(savedFiles);
-        // 如果是有效陣列且有內容，檢查是否有缺失欄位 (例如 lastModified)
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map(f => ({
-            ...f,
-            title: f.title || "未命名檔案",
-            content: f.content || "",
-            // 🔴 關鍵修復：如果舊檔案沒有 lastModified，自動補上現在時間，防止 .split() 崩潰
-            lastModified: f.lastModified || new Date().toLocaleString()
-          }));
-        }
-      }
-      // 如果沒有檔案或格式錯誤，嘗試讀取舊草稿
-      const oldDraft = localStorage.getItem("memo_draft");
-      return [{ 
-        id: Date.now(), 
-        title: "未命名檔案", 
-        content: oldDraft || "", 
-        lastModified: new Date().toLocaleString() 
-      }];
-    } catch {
-      return [{ id: Date.now(), title: "未命名檔案", content: "", lastModified: new Date().toLocaleString() }];
-    }
-  });
-
-  // ★★★ 防護網 2：ID 初始值 (加上 ?. 防呆) ★★★
-  const [activeFileId, setActiveFileId] = useState(() => files[0]?.id || Date.now());
-  const [showFileList, setShowFileList] = useState(false);
-  
+const PageMemo = ({ isDark, apiKey, setShowChat, files, setFiles, activeFileId, setActiveFileId }) => {
   const [res, setRes] = useState("");
   const [loading, setLoading] = useState(false);
   const textAreaRef = useRef(null);
 
   // ★★★ 防護網 3：取得 activeFile 時，如果找不到，回傳一個安全的空物件 ★★★
-  const activeFile = files.find(f => f.id === activeFileId) || files[0] || { title: "Error", content: "", lastModified: new Date().toLocaleString() };
-
-  // 自動存檔
-  useEffect(() => {
-    if (files.length > 0) {
-      localStorage.setItem("memo_files", JSON.stringify(files));
-    }
-  }, [files]);
+  const activeFile = files.find(f => f.id === activeFileId) || { title: "Error", content: "", lastModified: new Date().toLocaleString() };
 
   const updateContent = (newContent) => {
     setFiles(files.map(f => f.id === activeFileId ? { ...f, content: newContent, lastModified: new Date().toLocaleString() } : f));
@@ -600,28 +567,6 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
 
   const updateTitle = (newTitle) => {
     setFiles(files.map(f => f.id === activeFileId ? { ...f, title: newTitle } : f));
-  };
-
-  const createNewFile = () => {
-    const newFile = {
-      id: Date.now(),
-      title: `新檔案 ${files.length + 1}`,
-      content: "",
-      lastModified: new Date().toLocaleString()
-    };
-    setFiles([newFile, ...files]);
-    setActiveFileId(newFile.id);
-    setShowFileList(false);
-  };
-
-  const deleteFile = (e, id) => {
-    e.stopPropagation();
-    if (files.length <= 1) return alert("至少要保留一個檔案喔！");
-    if (window.confirm("確定要刪除這個檔案嗎？")) {
-      const newFiles = files.filter(f => f.id !== id);
-      setFiles(newFiles);
-      if (activeFileId === id) setActiveFileId(newFiles[0].id);
-    }
   };
 
   const gen = async () => {
@@ -665,9 +610,7 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
     <div className="space-y-5 animate-fade-in pb-32 relative">
        {/* 標題與檔案切換區 */}
        <div className="flex items-center gap-3 mt-2">
-          <button onClick={() => setShowFileList(true)} className="p-2 bg-purple-500/10 rounded-xl text-purple-500 active:scale-95 transition-transform">
-            <FolderOpen size={20}/>
-          </button>
+          {/* 因為已經有全域側邊欄，這裡的按鈕可以拿掉，或是作為快捷鍵 */}
           <div className="flex-1">
             <input 
               className="w-full bg-transparent text-xl font-bold outline-none placeholder-opacity-50 text-purple-400" 
@@ -678,52 +621,6 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
             <p className="text-[10px] opacity-40 font-mono mt-0.5">最後編輯: {activeFile.lastModified || "剛剛"}</p>
           </div>
        </div>
-
-       {/* 檔案列表側邊欄 */}
-       {showFileList && (
-         <div className="absolute inset-0 z-50 flex animate-fade-in" style={{top: '-20px', left: '-20px', width: 'calc(100% + 40px)', height: 'calc(100% + 100px)'}}>
-            <div className={`w-3/4 h-full p-5 flex flex-col gap-4 shadow-2xl backdrop-blur-xl ${isDark ? 'bg-[#1a1b23]/95' : 'bg-[#E0E5EC]/95'}`}>
-               <div className="flex justify-between items-center mb-2">
-                 <span className="font-bold text-lg flex items-center gap-2"><FolderOpen size={20}/> 我的檔案</span>
-                 <button onClick={() => setShowFileList(false)}><X size={20} className="opacity-50"/></button>
-               </div>
-               
-               <div className="flex-1 overflow-y-auto space-y-3 no-scrollbar">
-                 {files.map(file => (
-                   <div 
-                     key={file.id} 
-                     onClick={() => { setActiveFileId(file.id); setShowFileList(false); }}
-                     className={`p-4 rounded-xl flex justify-between items-center border transition-all active:scale-95 cursor-pointer
-                       ${activeFileId === file.id 
-                         ? (isDark ? 'bg-purple-600 border-purple-500 text-white' : 'bg-purple-500 border-purple-400 text-white') 
-                         : (isDark ? 'bg-[#252630] border-white/5' : 'bg-white border-white/40')}
-                     `}
-                   >
-                     <div className="flex items-center gap-3 overflow-hidden">
-                       <FileText size={18} className={activeFileId === file.id ? 'opacity-100' : 'opacity-50'}/>
-                       <div className="flex flex-col truncate">
-                         <span className="text-sm font-bold truncate">{file.title}</span>
-                         {/* ★★★ 防呆：防止 .split() 報錯 ★★★ */}
-                         <span className="text-[10px] opacity-60">{(file.lastModified || "").split(' ')[0]}</span>
-                       </div>
-                     </div>
-                     {files.length > 1 && (
-                       <button onClick={(e) => deleteFile(e, file.id)} className="p-2 hover:bg-black/20 rounded-full">
-                         <Trash2 size={14}/>
-                       </button>
-                     )}
-                   </div>
-                 ))}
-               </div>
-
-               <button onClick={createNewFile} className="w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl text-white font-bold shadow-lg flex items-center justify-center gap-2 active:scale-95">
-                 <FilePlus size={18}/> 新增檔案
-               </button>
-            </div>
-            {/* 遮罩背景 */}
-            <div className="flex-1 bg-black/50" onClick={() => setShowFileList(false)}></div>
-         </div>
-       )}
 
        {/* 主要編輯區 */}
        <NeuBox isDark={isDark} pressed className="p-5 h-[40vh] relative transition-all">
@@ -793,6 +690,7 @@ const PageGenerator = ({ isDark, apiKey }) => {
   const saveToVault = (content, type = 'snippet') => {
       if(!content) return;
       const vault = JSON.parse(localStorage.getItem('memo_vault') || '[]');
+      // 這裡 type 預設存為 'snippet' (碎片)，人設表則存為 'char' (人設)
       const newItem = { id: Date.now(), type: type, content: content, date: new Date().toLocaleDateString() };
       localStorage.setItem('memo_vault', JSON.stringify([newItem, ...vault]));
       alert("✅ 已存入靈感庫！");
@@ -887,7 +785,7 @@ const PageGenerator = ({ isDark, apiKey }) => {
 };
 
 // --- 頁面: 我 (修復：淺/深/系統 模式切換) ---
-const PageMe = ({ isDark, apiKey, setApiKey, themeMode, setThemeMode }) => {
+const PageMe = ({ isDark, apiKey, setApiKey, themeMode, setThemeMode, files }) => {
   const [show, setShow] = useState(false);
 
   // ★★★ 匯出資料功能 ★★★
@@ -897,7 +795,7 @@ const PageMe = ({ isDark, apiKey, setApiKey, themeMode, setThemeMode }) => {
       memo_vault: localStorage.getItem('memo_vault'),
       gemini_key: localStorage.getItem('gemini_key'),
       theme_mode: localStorage.getItem('theme_mode'),
-      memo_files: localStorage.getItem('memo_files')
+      memo_files: JSON.stringify(files) // 使用傳入的最新 files 狀態
     };
     const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -1005,7 +903,7 @@ const SplashScreen = ({ onFinish }) => {
   );
 };
 
-// --- App ---
+// --- App (主程式：狀態提升，解決側邊欄覆蓋問題) ---
 const App = () => {
   const [showSplash, setShowSplash] = useState(true); 
   const [activeTab, setActiveTab] = useState("memo");
@@ -1013,35 +911,128 @@ const App = () => {
   const [themeMode, setThemeMode] = useState(localStorage.getItem("theme_mode") || "system");
   const [isDark, setIsDark] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false); // ★★★ 側邊欄狀態提升 ★★★
+
+  // ★★★ 全域防護：檔案管理狀態 (也提升到 App 層，防止黑屏) ★★★
+  const [files, setFiles] = useState(() => {
+    try {
+      const saved = localStorage.getItem("memo_files");
+      const parsed = saved ? JSON.parse(saved) : [];
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // 自動補全 lastModified 防黑屏
+        return parsed.map(f => ({ ...f, lastModified: f.lastModified || new Date().toLocaleString() }));
+      }
+      return [{ id: Date.now(), title: "未命名檔案", content: "", lastModified: new Date().toLocaleString() }];
+    } catch {
+      return [{ id: Date.now(), title: "未命名檔案", content: "", lastModified: new Date().toLocaleString() }];
+    }
+  });
+  const [activeFileId, setActiveFileId] = useState(() => files[0]?.id || Date.now());
+
+  // 檔案存檔副作用
+  useEffect(() => { if(files.length > 0) localStorage.setItem("memo_files", JSON.stringify(files)); }, [files]);
 
   useEffect(() => {
-    const applyTheme = () => {
-      const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const isDarkMode = themeMode === 'system' ? systemDark : themeMode === 'dark';
-      setIsDark(isDarkMode);
-    };
-    applyTheme();
-    localStorage.setItem("theme_mode", themeMode);
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    mediaQuery.addEventListener('change', applyTheme);
-    return () => mediaQuery.removeEventListener('change', applyTheme);
+    const applyTheme = () => { const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches; setIsDark(themeMode === 'system' ? systemDark : themeMode === 'dark'); };
+    applyTheme(); localStorage.setItem("theme_mode", themeMode);
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)'); mediaQuery.addEventListener('change', applyTheme); return () => mediaQuery.removeEventListener('change', applyTheme);
   }, [themeMode]);
 
+  // 新增檔案邏輯
+  const createNewFile = () => {
+    const newFile = { id: Date.now(), title: `新檔案 ${files.length + 1}`, content: "", lastModified: new Date().toLocaleString() };
+    setFiles([newFile, ...files]);
+    setActiveFileId(newFile.id);
+    setShowSidebar(false);
+  };
+
+  // 刪除檔案邏輯
+  const deleteFile = (e, id) => {
+    e.stopPropagation();
+    if(files.length <= 1) return alert("至少保留一個檔案");
+    if(window.confirm("刪除此檔案？")) {
+      const newFiles = files.filter(f => f.id !== id);
+      setFiles(newFiles);
+      if(activeFileId === id) setActiveFileId(newFiles[0].id);
+    }
+  };
+
   if (showSplash) return <SplashScreen onFinish={() => setShowSplash(false)} />;
-  
   if (showChat) return <ChatInterface onClose={() => setShowChat(false)} />;
 
   return (
     <div className={`min-h-screen transition-colors duration-300 font-sans relative overflow-x-hidden safe-top safe-bottom ${isDark ? 'bg-[#202130] text-gray-200' : 'bg-[#E0E5EC] text-[#5b5d7e]'}`}>
       <style>{styles}</style>
-      <div className="pt-12 pb-4 text-center px-4"><h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-indigo-400 tracking-tight">MemoLive</h1><p className="text-[10px] font-bold opacity-30 tracking-[0.3em] mt-1">ULTIMATE</p></div>
+      
+      {/* 頂部 Header (含漢堡選單) */}
+      <div className="pt-12 pb-4 px-4 flex items-center justify-center relative">
+        {/* ★★★ 左上角漢堡選單 (觸發側邊欄) ★★★ */}
+        <button onClick={() => setShowSidebar(true)} className="absolute left-4 p-2 rounded-full active:bg-gray-500/20 transition-colors">
+            <Menu size={24} className={isDark ? "text-white" : "text-gray-700"}/>
+        </button>
+        
+        <div className="text-center">
+            <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-indigo-400 tracking-tight">MemoLive</h1>
+            <p className="text-[10px] font-bold opacity-30 tracking-[0.3em] mt-1">ULTIMATE</p>
+        </div>
+      </div>
+
+      {/* ★★★ 全局側邊欄 (Global Drawer - 覆蓋一切) ★★★ */}
+      {showSidebar && (
+        <div className="fixed inset-0 z-[100] flex safe-top safe-bottom">
+            {/* 背景遮罩 */}
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowSidebar(false)}></div>
+            
+            {/* 側邊欄本體 (從左側滑入) */}
+            <div className={`w-[80%] max-w-[300px] h-full shadow-2xl p-6 flex flex-col gap-6 animate-slide-in-left relative ${isDark ? 'bg-[#1e1f29]' : 'bg-[#f0f2f5]'}`}>
+                <div className="flex justify-between items-center pb-4 border-b border-gray-500/10">
+                    <span className="font-bold text-lg flex items-center gap-2"><FolderOpen size={20}/> 我的檔案</span>
+                    <button onClick={() => setShowSidebar(false)}><X size={20} className="opacity-50"/></button>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto space-y-3 no-scrollbar">
+                    {files.map(file => (
+                        <div 
+                            key={file.id} 
+                            onClick={() => { setActiveFileId(file.id); setShowSidebar(false); }}
+                            className={`p-4 rounded-xl flex justify-between items-center border transition-all active:scale-95 cursor-pointer
+                                ${activeFileId === file.id 
+                                    ? (isDark ? 'bg-purple-600 border-purple-500 text-white' : 'bg-purple-500 border-purple-400 text-white') 
+                                    : (isDark ? 'bg-[#252630] border-white/5' : 'bg-white border-gray-200')}
+                            `}
+                        >
+                            <div className="flex items-center gap-3 overflow-hidden">
+                                <FileText size={18} className={activeFileId === file.id ? 'opacity-100' : 'opacity-50'}/>
+                                <div className="flex flex-col truncate">
+                                    <span className="text-sm font-bold truncate">{file.title}</span>
+                                    <span className="text-[10px] opacity-60">{(file.lastModified || "").split(' ')[0]}</span>
+                                </div>
+                            </div>
+                            {files.length > 1 && (
+                                <button onClick={(e) => deleteFile(e, file.id)} className="p-2 hover:bg-black/20 rounded-full transition-colors">
+                                    <Trash2 size={14}/>
+                                </button>
+                            )}
+                        </div>
+                    ))}
+                </div>
+
+                <button onClick={createNewFile} className="w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl text-white font-bold shadow-lg flex items-center justify-center gap-2 active:scale-95">
+                    <FilePlus size={18}/> 新增檔案
+                </button>
+            </div>
+        </div>
+      )}
+
       <div className="max-w-md mx-auto h-full px-5">
-        {activeTab === 'memo' && <PageMemo isDark={isDark} apiKey={apiKey} setShowChat={setShowChat} />}
+        {activeTab === 'memo' && <PageMemo isDark={isDark} apiKey={apiKey} setShowChat={setShowChat} files={files} setFiles={setFiles} activeFileId={activeFileId} setActiveFileId={setActiveFileId} />}
         {activeTab === 'generator' && <PageGenerator isDark={isDark} apiKey={apiKey} />}
         {activeTab === 'vault' && <PageVault isDark={isDark} apiKey={apiKey} />}
-        {activeTab === 'me' && <PageMe isDark={isDark} apiKey={apiKey} setApiKey={setApiKey} themeMode={themeMode} setThemeMode={setThemeMode} />}
+        {activeTab === 'me' && <PageMe isDark={isDark} apiKey={apiKey} setApiKey={setApiKey} themeMode={themeMode} setThemeMode={setThemeMode} files={files} />}
       </div>
-      <Navigation activeTab={activeTab} setActiveTab={setActiveTab} isDark={isDark} />
+      
+      {/* 導航列 (forceHide: 當側邊欄打開時隱藏) */}
+      <Navigation activeTab={activeTab} setActiveTab={setActiveTab} isDark={isDark} forceHide={showSidebar} />
     </div>
   );
 };
