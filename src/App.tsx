@@ -365,20 +365,19 @@ const PageVault = ({ isDark, apiKey }) => {
 
 // --- 頁面: 續寫 (升級版：多檔案管理 + AI 續寫) ---
 const PageMemo = ({ isDark, apiKey, setShowChat }) => {
-  // ★★★ 防護網 1：初始化資料庫 (絕對禁止空陣列) ★★★
+  // ★★★ 防護網 1：初始化資料庫 (確保永遠不會是空陣列) ★★★
   const [files, setFiles] = useState(() => {
     try {
       const savedFiles = localStorage.getItem("memo_files");
       if (savedFiles) {
         const parsed = JSON.parse(savedFiles);
-        // ✅ 修正點：必須確認它是陣列，而且「長度大於 0」才准用！
+        // ✅ 修正重點：一定要檢查長度！如果是空的 []，就視為無效，往下走去建立預設檔案
         if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed;
         }
       }
-      // 如果沒有檔案(或是空的)，嘗試讀舊草稿
+      // 如果沒有檔案或是空的，建立一個預設檔案
       const oldDraft = localStorage.getItem("memo_draft");
-      // ✅ 強制回傳預設檔案，確保 files 永遠有東西
       return [{ 
         id: Date.now(), 
         title: "未命名檔案", 
@@ -386,13 +385,12 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
         lastModified: new Date().toLocaleString() 
       }];
     } catch {
-      // 萬一發生靈異現象，最後一道防線
+      // 萬一發生任何錯誤，回傳一個全新的預設檔案
       return [{ id: Date.now(), title: "未命名檔案", content: "", lastModified: new Date().toLocaleString() }];
     }
   });
 
-  // ★★★ 防護網 2：ID 狀態初始化 (加上 ?. 防呆) ★★★
-  // 萬一 files[0] 真的是空的，給一個新的 Date.now()，不要讓程式崩潰
+  // ★★★ 防護網 2：ID 初始值 (加上 ?. 防呆，防止 files[0] 為空時崩潰) ★★★
   const [activeFileId, setActiveFileId] = useState(() => files[0]?.id || Date.now());
   const [showFileList, setShowFileList] = useState(false);
   
@@ -400,13 +398,12 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
   const [loading, setLoading] = useState(false);
   const textAreaRef = useRef(null);
 
-  // ★★★ 防護網 3：取得當前檔案 (找不到就回傳第一個) ★★★
-  // 如果 files[0] 也不存在 (極低機率)，給一個假的空物件，防止渲染時報錯
-  const activeFile = files.find(f => f.id === activeFileId) || files[0] || { title: "Error", content: "" };
+  // ★★★ 防護網 3：取得當前檔案 (找不到時回傳第一個，再找不到回傳空物件，防止渲染崩潰) ★★★
+  const activeFile = files.find(f => f.id === activeFileId) || files[0] || { title: "", content: "", lastModified: "" };
 
   // 自動存檔
   useEffect(() => {
-    // 只有當 files 有內容時才存檔，避免把壞掉的狀態存進去
+    // 只有當 files 有東西時才存檔，避免存入空陣列
     if (files.length > 0) {
       localStorage.setItem("memo_files", JSON.stringify(files));
     }
@@ -489,11 +486,11 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
           <div className="flex-1">
             <input 
               className="w-full bg-transparent text-xl font-bold outline-none placeholder-opacity-50 text-purple-400" 
-              value={activeFile.title} 
+              value={activeFile.title || ""} 
               onChange={(e) => updateTitle(e.target.value)}
               placeholder="輸入標題..."
             />
-            <p className="text-[10px] opacity-40 font-mono mt-0.5">最後編輯: {activeFile.lastModified}</p>
+            <p className="text-[10px] opacity-40 font-mono mt-0.5">最後編輯: {activeFile.lastModified || "剛剛"}</p>
           </div>
        </div>
 
@@ -521,7 +518,8 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
                        <FileText size={18} className={activeFileId === file.id ? 'opacity-100' : 'opacity-50'}/>
                        <div className="flex flex-col truncate">
                          <span className="text-sm font-bold truncate">{file.title}</span>
-                         <span className="text-[10px] opacity-60">{file.lastModified.split(' ')[0]}</span>
+                         {/* 這裡加了防護，防止 lastModified 不存在時報錯 */}
+                         <span className="text-[10px] opacity-60">{(file.lastModified || "").split(' ')[0]}</span>
                        </div>
                      </div>
                      {files.length > 1 && (
@@ -547,7 +545,7 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
             ref={textAreaRef} 
             className="w-full h-full bg-transparent outline-none resize-none text-base leading-relaxed opacity-80 placeholder-opacity-40 allow-select" 
             placeholder="開始你的創作..." 
-            value={activeFile.content} 
+            value={activeFile.content || ""} 
             onChange={e=>updateContent(e.target.value)} 
             maxLength={50000} 
          />
@@ -576,6 +574,7 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
     </div>
   );
 };
+
 
 // --- 頁面: 生成器 (包含：靈感生成(舊) + 潤色工具(新)) ---
 const PageGenerator = ({ isDark, apiKey }) => {
