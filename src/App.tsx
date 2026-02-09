@@ -154,56 +154,6 @@ const ChatInterface = ({ onClose }) => {
   );
 };
 
-  return (
-    <div className="fixed inset-0 z-[100] bg-[#1a1b23] flex flex-col animate-fade-in">
-      {/* 頂部導航 */}
-      <div className="flex items-center justify-between p-4 pt-12 border-b border-white/5 bg-[#1a1b23]">
-        <button onClick={onClose} className="flex items-center gap-1 text-gray-400 text-sm font-bold active:scale-95"><ChevronLeft size={20}/> 返回</button>
-        <span className="text-white font-bold text-sm tracking-wider">角色實時互動空間</span>
-        <div className="flex gap-3 text-gray-400"><Share2 size={20}/><MoreHorizontal size={20}/></div>
-      </div>
-
-      {/* 聊天內容區 */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
-         {messages.length === 0 && (
-            <div className="h-full flex flex-col items-center justify-center opacity-30">
-                <MessageCircle size={40} className="mb-2"/>
-                <span className="text-xs">開始第一句對話...</span>
-            </div>
-         )}
-         {messages.map((m, i) => (
-           <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-             <div className={`max-w-[80%] p-3 rounded-2xl text-sm leading-relaxed ${m.role === 'user' ? 'bg-purple-600 text-white rounded-br-none' : 'bg-[#252630] text-gray-200 rounded-bl-none border border-white/5'}`}>
-               {m.text}
-             </div>
-           </div>
-         ))}
-         {loading && <div className="text-xs text-gray-500 animate-pulse ml-2">角色正在輸入...</div>}
-         <div ref={bottomRef} />
-      </div>
-
-      {/* 輸入區 */}
-      <div className="p-4 pb-10 bg-[#1a1b23]">
-         <div className="bg-[#252630] rounded-[20px] p-1.5 pl-5 flex items-center shadow-lg border border-white/5">
-            <input 
-              className="flex-1 bg-transparent outline-none text-white text-sm h-10 placeholder-gray-600" 
-              placeholder="輸入你想說的話..." 
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && sendMessage()}
-            />
-            <button 
-              onClick={sendMessage}
-              disabled={loading}
-              className={`w-10 h-10 rounded-full flex items-center justify-center text-white shadow-lg transition-transform ${loading ? 'bg-gray-600' : 'bg-purple-600 active:scale-90'}`}
-            >
-              <Send size={18} className="ml-0.5"/>
-            </button>
-         </div>
-      </div>
-    </div>
-  );
-};
 
 // --- API 核心 ---
 const callGemini = async (apiKey, prompt, useWeb = false) => {
@@ -395,8 +345,6 @@ const PageVault = ({ isDark, apiKey }) => {
        </div>
     </div>
   );
-};
-
 };
 
 // --- 頁面: 續寫 (萬字支援 + 擴寫魔杖 + 1500字 + 聯網) ---
