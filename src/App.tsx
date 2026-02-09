@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 // ★★★ 確保所有圖示引入完整，絕不白畫面 ★★★
-import { Sparkles, Zap, Edit3, User, List, Package, Plus, X, ChevronLeft, Share2, MoreHorizontal, Send, Copy, Settings, Dice5, Save, LayoutTemplate, Moon, Sun, Globe, MessageCircle, Monitor, Wand2, Eye, Footprints, Smile, PenTool, Trash2, Download, Upload } from 'lucide-react';
+// 📌 1. 更新 Import (加入了 FolderOpen, FileText, FilePlus, ChevronRight)
+import { Sparkles, Zap, Edit3, User, List, Package, Plus, X, ChevronLeft, Share2, MoreHorizontal, Send, Copy, Settings, Dice5, Save, LayoutTemplate, Moon, Sun, Globe, MessageCircle, Monitor, Wand2, Eye, Footprints, Smile, PenTool, Trash2, Search, Download, Upload, FolderOpen, FileText, FilePlus, ChevronRight } from 'lucide-react';
 
 // --- 1. 更新樣式區塊 ---
 const styles = `
@@ -394,25 +395,85 @@ const PageVault = ({ isDark, apiKey }) => {
   );
 };
 
-// --- 頁面: 續寫 (萬字支援 + 擴寫魔杖 + 1500字 + 聯網) ---
+// --- 頁面: 續寫 (升級版：多檔案管理 + AI 續寫) ---
 const PageMemo = ({ isDark, apiKey, setShowChat }) => {
-  // ★★★ 修改：初始值從 localStorage 讀取 (防止資料遺失) ★★★
-  const [note, setNote] = useState(() => localStorage.getItem("memo_draft") || "");
+  // ★★★ 1. 初始化資料庫 (含舊資料遷移邏輯) ★★★
+  const [files, setFiles] = useState(() => {
+    try {
+      const savedFiles = localStorage.getItem("memo_files");
+      if (savedFiles) return JSON.parse(savedFiles);
+      
+      // 如果沒有新版檔案，檢查有沒有舊版草稿 (自動遷移)
+      const oldDraft = localStorage.getItem("memo_draft");
+      return [{ 
+        id: Date.now(), 
+        title: "未命名檔案", 
+        content: oldDraft || "", 
+        lastModified: new Date().toLocaleString() 
+      }];
+    } catch {
+      return [{ id: Date.now(), title: "未命名檔案", content: "", lastModified: new Date().toLocaleString() }];
+    }
+  });
+
+  // 當前開啟的檔案 ID
+  const [activeFileId, setActiveFileId] = useState(() => files[0].id);
+  const [showFileList, setShowFileList] = useState(false); // 控制檔案列表側邊欄
+  
+  // AI 相關狀態
   const [res, setRes] = useState("");
   const [loading, setLoading] = useState(false);
   const textAreaRef = useRef(null);
 
-  // ★★★ 新增：當 note 內容改變，自動存入手機 ★★★
-  useEffect(() => {
-    localStorage.setItem("memo_draft", note);
-  }, [note]);
+  // 取得當前檔案物件
+  const activeFile = files.find(f => f.id === activeFileId) || files[0];
 
+  // ★★★ 2. 自動存檔 (存整個檔案列表) ★★★
+  useEffect(() => {
+    localStorage.setItem("memo_files", JSON.stringify(files));
+  }, [files]);
+
+  // 更新當前檔案內容
+  const updateContent = (newContent) => {
+    setFiles(files.map(f => f.id === activeFileId ? { ...f, content: newContent, lastModified: new Date().toLocaleString() } : f));
+  };
+
+  // 更新當前檔案標題
+  const updateTitle = (newTitle) => {
+    setFiles(files.map(f => f.id === activeFileId ? { ...f, title: newTitle } : f));
+  };
+
+  // 新增檔案
+  const createNewFile = () => {
+    const newFile = {
+      id: Date.now(),
+      title: `新檔案 ${files.length + 1}`,
+      content: "",
+      lastModified: new Date().toLocaleString()
+    };
+    setFiles([newFile, ...files]);
+    setActiveFileId(newFile.id); // 自動切換到新檔案
+    setShowFileList(false); // 關閉列表
+  };
+
+  // 刪除檔案
+  const deleteFile = (e, id) => {
+    e.stopPropagation();
+    if (files.length <= 1) return alert("至少要保留一個檔案喔！");
+    if (window.confirm("確定要刪除這個檔案嗎？無法復原喔。")) {
+      const newFiles = files.filter(f => f.id !== id);
+      setFiles(newFiles);
+      if (activeFileId === id) setActiveFileId(newFiles[0].id); // 如果刪除的是當前檔案，切換到第一個
+    }
+  };
+
+  // --- AI 功能 (對接 activeFile.content) ---
   const gen = async () => {
     if (!apiKey) return alert("請設定 API Key");
-    if (!note) return alert("內容不能為空");
+    if (!activeFile.content) return alert("內容不能為空");
     setLoading(true);
     try {
-      const prompt = `角色：同人小說家。任務：續寫文章。步驟：1.分析原文人物性格(OOC禁止)、風格。2.聯網確認偶像/影視資訊。3.續寫長度需達【1500字以上】。原文：${note}`;
+      const prompt = `角色：同人小說家。任務：續寫文章。步驟：1.分析原文人物性格(OOC禁止)、風格。2.聯網確認偶像/影視資訊。3.續寫長度需達【1500字以上】。原文：${activeFile.content}`;
       const text = await callGemini(apiKey, prompt, true);
       setRes(text);
     } catch (e) { alert(e.message); } finally { setLoading(false); }
@@ -423,7 +484,7 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
     if (!textarea) return;
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
-    const selectedText = note.substring(start, end);
+    const selectedText = activeFile.content.substring(start, end);
 
     if (!selectedText || selectedText.trim().length === 0) return alert("請先選取您想要擴寫的句子！");
     if (!apiKey) return alert("請設定 API Key");
@@ -432,38 +493,101 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
     try {
         const prompt = `角色：細膩的文學家。任務：請將這句話擴寫成一段充滿畫面感、微表情、動作與環境描寫的細膩段落（約 50-100 字）。請保持原意，但大幅增加質感。原句：${selectedText}`;
         const expandedText = await callGemini(apiKey, prompt, false);
-        const newText = note.substring(0, start) + expandedText + note.substring(end);
-        setNote(newText);
+        const newText = activeFile.content.substring(0, start) + expandedText + activeFile.content.substring(end);
+        updateContent(newText);
     } catch(e) { alert(e.message); } finally { setLoading(false); }
   };
 
-  // ★★★ 新增：一鍵插入功能 (合併內文) ★★★
   const insertText = () => {
     if(!res) return;
-    setNote(prev => prev + "\n\n" + res); // 接在文章最後面 (加兩個換行)
-    setRes(""); // 清空結果框，代表已處理
+    updateContent(activeFile.content + "\n\n" + res);
+    setRes("");
     alert("✅ 已插入文章末尾！");
   };
 
   return (
-    <div className="space-y-5 animate-fade-in pb-32">
-       <div className="flex items-center gap-2 opacity-60 px-2 mt-2"><Edit3 size={20}/> <h2 className="text-xl font-bold">筆記續寫</h2></div>
-       <NeuBox isDark={isDark} pressed className="p-5 h-[40vh] relative">
+    <div className="space-y-5 animate-fade-in pb-32 relative">
+       {/* 標題與檔案切換區 */}
+       <div className="flex items-center gap-3 mt-2">
+          <button onClick={() => setShowFileList(true)} className="p-2 bg-purple-500/10 rounded-xl text-purple-500 active:scale-95 transition-transform">
+            <FolderOpen size={20}/>
+          </button>
+          <div className="flex-1">
+            <input 
+              className="w-full bg-transparent text-xl font-bold outline-none placeholder-opacity-50 text-purple-400" 
+              value={activeFile.title} 
+              onChange={(e) => updateTitle(e.target.value)}
+              placeholder="輸入標題..."
+            />
+            <p className="text-[10px] opacity-40 font-mono mt-0.5">最後編輯: {activeFile.lastModified}</p>
+          </div>
+       </div>
+
+       {/* ★★★ 檔案列表側邊欄 (Drawer) ★★★ */}
+       {showFileList && (
+         <div className="absolute inset-0 z-50 flex animate-fade-in" style={{top: '-20px', left: '-20px', width: 'calc(100% + 40px)', height: 'calc(100% + 100px)'}}>
+            <div className={`w-3/4 h-full p-5 flex flex-col gap-4 shadow-2xl backdrop-blur-xl ${isDark ? 'bg-[#1a1b23]/95' : 'bg-[#E0E5EC]/95'}`}>
+               <div className="flex justify-between items-center mb-2">
+                 <span className="font-bold text-lg flex items-center gap-2"><FolderOpen size={20}/> 我的檔案</span>
+                 <button onClick={() => setShowFileList(false)}><X size={20} className="opacity-50"/></button>
+               </div>
+               
+               <div className="flex-1 overflow-y-auto space-y-3 no-scrollbar">
+                 {files.map(file => (
+                   <div 
+                     key={file.id} 
+                     onClick={() => { setActiveFileId(file.id); setShowFileList(false); }}
+                     className={`p-4 rounded-xl flex justify-between items-center border transition-all active:scale-95 cursor-pointer
+                       ${activeFileId === file.id 
+                         ? (isDark ? 'bg-purple-600 border-purple-500 text-white' : 'bg-purple-500 border-purple-400 text-white') 
+                         : (isDark ? 'bg-[#252630] border-white/5' : 'bg-white border-white/40')}
+                     `}
+                   >
+                     <div className="flex items-center gap-3 overflow-hidden">
+                       <FileText size={18} className={activeFileId === file.id ? 'opacity-100' : 'opacity-50'}/>
+                       <div className="flex flex-col truncate">
+                         <span className="text-sm font-bold truncate">{file.title}</span>
+                         <span className="text-[10px] opacity-60">{file.lastModified.split(' ')[0]}</span>
+                       </div>
+                     </div>
+                     {files.length > 1 && (
+                       <button onClick={(e) => deleteFile(e, file.id)} className="p-2 hover:bg-black/20 rounded-full">
+                         <Trash2 size={14}/>
+                       </button>
+                     )}
+                   </div>
+                 ))}
+               </div>
+
+               <button onClick={createNewFile} className="w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl text-white font-bold shadow-lg flex items-center justify-center gap-2 active:scale-95">
+                 <FilePlus size={18}/> 新增檔案
+               </button>
+            </div>
+            {/* 點擊半透明背景關閉 */}
+            <div className="flex-1 bg-black/50" onClick={() => setShowFileList(false)}></div>
+         </div>
+       )}
+
+       {/* 主要編輯區 */}
+       <NeuBox isDark={isDark} pressed className="p-5 h-[40vh] relative transition-all">
          <textarea 
             ref={textAreaRef} 
             className="w-full h-full bg-transparent outline-none resize-none text-base leading-relaxed opacity-80 placeholder-opacity-40 allow-select" 
-            placeholder="請貼上你的文章 (支援 50,000 字以上)... 選取文字可使用魔杖擴寫" 
-            value={note} 
-            onChange={e=>setNote(e.target.value)} 
+            placeholder="開始你的創作..." 
+            value={activeFile.content} 
+            onChange={e=>updateContent(e.target.value)} 
             maxLength={50000} 
          />
-         {/* 擴寫按鈕 */}
          <button onClick={expandSentence} className="absolute bottom-4 right-4 p-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full shadow-lg text-white active:scale-90 transition-transform flex items-center justify-center" title="✨ 擴寫選取文字"><Wand2 size={20}/></button>
        </NeuBox>
+
+       {/* 功能按鈕區 */}
        <div className="flex gap-4">
-         <NeuBox isDark={isDark} onClick={gen} className="flex-1 py-4 flex justify-center gap-2 font-bold text-purple-500 text-sm">{loading ? "..." : <><Zap size={18}/> 續寫</>}</NeuBox>
+         <NeuBox isDark={isDark} onClick={gen} className="flex-1 py-4 flex justify-center gap-2 font-bold text-purple-500 text-sm">{loading ? <span className="animate-pulse">✨ 寫作中...</span> : <><Zap size={18}/> 續寫</>}</NeuBox>
          <NeuBox isDark={isDark} onClick={() => setShowChat(true)} className="flex-1 py-4 flex justify-center gap-2 font-bold text-pink-500 text-sm"><MessageCircle size={18}/> 對話</NeuBox>
        </div>
+
+       {/* AI 結果區 */}
        <div className="flex flex-col gap-3">
           <div className="flex justify-between px-2 opacity-50"><span className="text-xs font-bold">AI 產出結果 (1500字+)</span>{res && <Copy size={14}/>}</div>
           
@@ -471,7 +595,6 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
              <NeuBox isDark={isDark} className="p-6 min-h-[250px] text-sm whitespace-pre-wrap leading-relaxed allow-select">
                 {res || <span className="opacity-20 text-xs flex items-center justify-center h-full">等待生成...</span>}
              </NeuBox>
-             {/* ★★★ 插入內文按鈕 ★★★ */}
              {res && (
                 <button onClick={insertText} className="absolute bottom-4 right-4 flex items-center gap-1 bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-lg active:scale-95 transition-transform">
                    <PenTool size={14}/> 插入內文
