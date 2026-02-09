@@ -1,24 +1,63 @@
 import React, { useState, useEffect, useRef } from 'react';
 // ★★★ 確保所有圖示引入完整，絕不白畫面 ★★★
-import { Sparkles, Zap, Edit3, User, List, Package, Plus, X, ChevronLeft, Share2, MoreHorizontal, Send, Copy, Settings, Dice5, Save, LayoutTemplate, Moon, Sun, Globe, MessageCircle, Monitor, Wand2, Eye, Footprints, Smile, PenTool, Trash2, Search, Download, Upload, FolderOpen, FileText, FilePlus, ChevronRight } from 'lucide-react';
+import { 
+  Sparkles, Zap, Edit3, User, List, Package, Plus, X, 
+  ChevronLeft, Share2, MoreHorizontal, Send, Copy, Settings, 
+  Dice5, Save, LayoutTemplate, Moon, Sun, Globe, MessageCircle, 
+  Monitor, Wand2, Eye, Footprints, Smile, PenTool, Trash2, 
+  Search, Download, Upload, FolderOpen, FileText, FilePlus, 
+  ChevronRight, Menu 
+} from 'lucide-react';
 
-// --- 1. 更新樣式區塊 (含 100分 UI 優化) ---
+// --- 1. 全局樣式區塊 (含動畫與 iPhone 適配) ---
 const styles = `
-  @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-  .animate-fade-in { animation: fade-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+  /* 進場動畫 */
+  @keyframes fade-in { 
+    from { opacity: 0; transform: translateY(10px); } 
+    to { opacity: 1; transform: translateY(0); } 
+  }
+  .animate-fade-in { 
+    animation: fade-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; 
+  }
   
-  @keyframes pulse-glow { 0%, 100% { opacity: 1; transform: scale(1); filter: drop-shadow(0 0 10px rgba(168,85,247,0.4)); } 50% { opacity: 0.7; transform: scale(0.95); filter: drop-shadow(0 0 20px rgba(168,85,247,0.8)); } }
-  .animate-pulse-glow { animation: pulse-glow 2.5s infinite ease-in-out; }
+  /* 側邊欄滑入動畫 */
+  @keyframes slide-in-right { 
+    from { transform: translateX(100%); } 
+    to { transform: translateX(0); } 
+  }
+  .animate-slide-in-right { 
+    animation: slide-in-right 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; 
+  }
 
-  @keyframes splash-out { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-20px); pointer-events: none; } }
-  .animate-splash-out { animation: splash-out 0.6s ease-in-out forwards; }
+  /* 呼吸燈效果 */
+  @keyframes pulse-glow { 
+    0%, 100% { opacity: 1; transform: scale(1); filter: drop-shadow(0 0 10px rgba(168,85,247,0.4)); } 
+    50% { opacity: 0.7; transform: scale(0.95); filter: drop-shadow(0 0 20px rgba(168,85,247,0.8)); } 
+  }
+  .animate-pulse-glow { 
+    animation: pulse-glow 2.5s infinite ease-in-out; 
+  }
 
-  /* 禁止橡皮筋回彈 & 點擊高亮 */
-  body { overscroll-behavior-y: none; -webkit-tap-highlight-color: transparent; }
+  /* 開場動畫退場 */
+  @keyframes splash-out { 
+    from { opacity: 1; transform: translateY(0); } 
+    to { opacity: 0; transform: translateY(-20px); pointer-events: none; } 
+  }
+  .animate-splash-out { 
+    animation: splash-out 0.6s ease-in-out forwards; 
+  }
 
+  /* 禁止橡皮筋回彈 & 點擊高亮 (App 質感關鍵) */
+  body { 
+    overscroll-behavior-y: none; 
+    -webkit-tap-highlight-color: transparent; 
+  }
+
+  /* 隱藏捲軸但保留功能 */
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
+  /* 允許選取文字 */
   .allow-select { user-select: text; -webkit-user-select: text; }
   
   /* 適配 iPhone 瀏海與 Home Bar */
@@ -53,11 +92,12 @@ const NeuBox = ({ children, className = '', pressed = false, onClick, isDark, ac
   );
 };
 
-// --- 導航列 (打字自動隱藏) ---
+// --- 導航列 (打字時自動隱藏) ---
 const Navigation = ({ activeTab, setActiveTab, isDark }) => {
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
+    // 偵測是否正在輸入
     const handleFocus = (e) => {
       const tag = e.target.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') {
@@ -66,6 +106,7 @@ const Navigation = ({ activeTab, setActiveTab, isDark }) => {
     };
 
     const handleBlur = (e) => {
+      // 延遲顯示，避免鍵盤收起時閃爍
       setTimeout(() => {
         const tag = document.activeElement?.tagName;
         if (tag !== 'INPUT' && tag !== 'TEXTAREA') {
@@ -110,15 +151,17 @@ const NavIcon = ({ icon: Icon, label, active, onClick, isDark }) => (
   </div>
 );
 
-// --- API 核心 (保留指定版本) ---
+// --- API 核心 (保留你指定的 Gemini 2.5) ---
 const callGemini = async (apiKey, prompt, useWeb = false) => {
   const tools = useWeb ? [{ googleSearch: {} }] : [];
-  // 保留你指定的 gemini-2.5-flash-preview-09-2025
+  
+  // 🔴 這裡遵照指示，保留 gemini-2.5-flash-preview-09-2025
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, { 
     method: "POST", 
     headers: { "Content-Type": "application/json" }, 
     body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], tools: tools }) 
   });
+  
   const data = await response.json();
   if (data.error) throw new Error(data.error.message);
   
@@ -128,54 +171,186 @@ const callGemini = async (apiKey, prompt, useWeb = false) => {
   return textPart ? textPart.text : "生成成功 (內容包含非文字資訊)";
 };
 
-// --- 對話介面 (Sticky Input + Safe Area) ---
+// --- 對話介面 (升級版：含側邊設定欄 + 雙重分享功能) ---
 const ChatInterface = ({ onClose }) => {
-  const [messages, setMessages] = useState([{role: 'ai', text: '（探頭）我是你的角色靈魂... 你想跟我聊什麼劇情？'}]);
+  // 角色設定狀態 (預設值)
+  const [charConfig, setCharConfig] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('chat_config') || '{"name":"神秘角色","setting":"你是一個神祕的小說角色，語氣要稍微高冷但帶點關心。"}'); } 
+    catch { return {name:"神秘角色", setting:"你是一個神祕的小說角色。"}; }
+  });
+  
+  const [messages, setMessages] = useState([{role: 'ai', text: `（看著你）我是 ${charConfig.name}。找我... 有事嗎？`}]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false); // 控制側邊欄顯示
   const bottomRef = useRef(null);
   const apiKey = localStorage.getItem("gemini_key");
 
+  // 自動捲動到底部
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  
+  // 自動儲存角色設定
+  useEffect(() => { localStorage.setItem('chat_config', JSON.stringify(charConfig)); }, [charConfig]);
 
   const sendMessage = async () => {
     if (!input.trim()) return;
     if (!apiKey) return alert("請先去「我」的頁面設定 API Key 喔！");
     if (loading) return;
+
     const userMsg = input;
     setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
     setInput("");
     setLoading(true);
+
     try {
-      const prompt = `System: 你現在是使用者筆下小說中的角色。請完全進入角色，用該角色的口吻、語氣、性格與作者（使用者）對話。不要跳出角色。User: ${userMsg}`;
+      // 🔴 關鍵升級：將角色設定注入 Prompt
+      const prompt = `System: 你現在正在進行角色扮演 (Roleplay)。
+      你的角色名稱：${charConfig.name}
+      你的詳細設定/人設：${charConfig.setting}
+      
+      請完全沉浸在角色中，用該角色的口吻、語氣、性格與使用者對話。絕對不要跳出角色，也不要承認自己是 AI。
+      
+      User: ${userMsg}`;
+      
       const reply = await callGemini(apiKey, prompt, false);
       setMessages(prev => [...prev, { role: 'ai', text: reply }]);
-    } catch (e) { setMessages(prev => [...prev, { role: 'ai', text: "😵 " + e.message }]); } 
-    finally { setLoading(false); }
+    } catch (e) { 
+      setMessages(prev => [...prev, { role: 'ai', text: "😵 訊號中斷... (" + e.message + ")" }]);
+    } finally { 
+      setLoading(false); 
+    }
+  };
+
+  // ★★★ 雙重分享功能：同時存入靈感庫 & 續寫 ★★★
+  const handleShare = () => {
+    if(messages.length < 2) return alert("還沒開始聊天呢！");
+    
+    const chatContent = messages.map(m => `[${m.role === 'user' ? '我' : charConfig.name}]: ${m.text}`).join('\n\n');
+    const timestamp = new Date().toLocaleString();
+
+    // 1. 存入靈感庫 (Vault) - Type: world (設定)
+    try {
+        const vault = JSON.parse(localStorage.getItem('memo_vault') || '[]');
+        vault.unshift({ 
+            id: Date.now(), 
+            type: 'world', // 存到設定分類
+            content: `【對話紀錄：${charConfig.name}】\n${chatContent}`, 
+            date: new Date().toLocaleDateString() 
+        });
+        localStorage.setItem('memo_vault', JSON.stringify(vault));
+    } catch(e) { console.error("Vault save failed", e); }
+
+    // 2. 存入續寫 (Memo) - 建立新檔案
+    try {
+        const files = JSON.parse(localStorage.getItem('memo_files') || '[]');
+        // 確保 files 是一個陣列 (全域防護的一部分)
+        const validFiles = Array.isArray(files) ? files : [];
+        
+        validFiles.unshift({
+            id: Date.now() + 1, // 確保 ID 不重複
+            title: `與 ${charConfig.name} 的對話`, 
+            content: chatContent,
+            lastModified: timestamp
+        });
+        localStorage.setItem('memo_files', JSON.stringify(validFiles));
+    } catch(e) { console.error("Memo save failed", e); }
+
+    alert(`✅ 已成功分享！\n1. 已存入「靈感庫-設定」\n2. 已建立新檔案在「續寫」頁面`);
   };
 
   return (
     <div className="fixed inset-0 z-[100] bg-[#1a1b23] flex flex-col animate-fade-in">
-      <div className="safe-top bg-[#1a1b23] z-30">
+      {/* 頂部導航 (Safe Area) */}
+      <div className="safe-top bg-[#1a1b23] z-30 relative">
         <div className="flex items-center justify-between p-4 border-b border-white/5">
             <button onClick={onClose} className="flex items-center gap-1 text-gray-400 text-sm font-bold active:scale-95"><ChevronLeft size={20}/> 返回</button>
-            <span className="text-white font-bold text-sm tracking-wider">角色實時互動</span>
-            <div className="flex gap-3 text-gray-400"><Share2 size={20}/><MoreHorizontal size={20}/></div>
+            <div className="flex flex-col items-center">
+                <span className="text-white font-bold text-sm tracking-wider">{charConfig.name}</span>
+                <span className="text-[10px] text-green-400 font-mono">Online</span>
+            </div>
+            <div className="flex gap-4 text-gray-400">
+                {/* 分享按鈕 (圖一圈選處) */}
+                <button onClick={handleShare} className="active:scale-90 active:text-purple-500 transition-transform"><Share2 size={20}/></button>
+                {/* 設定選單按鈕 (圖一圈選處) */}
+                <button onClick={() => setShowSidebar(true)} className="active:scale-90 active:text-purple-500 transition-transform"><MoreHorizontal size={20}/></button>
+            </div>
         </div>
       </div>
+
+      {/* ★★★ 角色設定側邊欄 (Sidebar - 圖二功能) ★★★ */}
+      {showSidebar && (
+        <div className="fixed inset-0 z-[200] flex justify-end safe-top safe-bottom">
+            {/* 背景遮罩 (點擊關閉) */}
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowSidebar(false)}></div>
+            
+            {/* 側邊欄本體 */}
+            <div className="w-[85%] max-w-[320px] h-full bg-[#1e1f29] shadow-2xl p-6 flex flex-col gap-6 animate-slide-in-right relative border-l border-white/10">
+                <div className="flex justify-between items-center pb-4 border-b border-white/5">
+                    <span className="text-white font-bold text-lg flex items-center gap-2"><Settings size={18}/> 角色設定</span>
+                    <button onClick={() => setShowSidebar(false)}><X size={20} className="text-gray-400"/></button>
+                </div>
+                
+                <div className="space-y-4 flex-1 overflow-y-auto no-scrollbar">
+                    <div className="space-y-2">
+                        <label className="text-xs text-purple-400 font-bold uppercase tracking-wider">角色名稱</label>
+                        <input 
+                            className="w-full bg-[#2a2b36] text-white p-3 rounded-xl outline-none border border-white/5 focus:border-purple-500 transition-colors text-sm font-bold"
+                            value={charConfig.name}
+                            onChange={e => setCharConfig({...charConfig, name: e.target.value})}
+                            placeholder="例如：霸道總裁"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-xs text-purple-400 font-bold uppercase tracking-wider">詳細人設 & 背景</label>
+                        <textarea 
+                            className="w-full h-48 bg-[#2a2b36] text-white p-3 rounded-xl outline-none border border-white/5 focus:border-purple-500 transition-colors text-sm leading-relaxed resize-none"
+                            value={charConfig.setting}
+                            onChange={e => setCharConfig({...charConfig, setting: e.target.value})}
+                            placeholder="輸入角色的性格、語氣、背景故事... (越詳細 AI 演得越像！)"
+                        />
+                    </div>
+                    <div className="p-3 bg-purple-500/10 rounded-xl text-xs text-purple-300 leading-relaxed border border-purple-500/20">
+                        💡 提示：設定完後，下一句對話 AI 就會切換成這個角色囉！
+                    </div>
+                </div>
+
+                <button 
+                    onClick={() => { setMessages([]); setShowSidebar(false); }}
+                    className="w-full py-3 bg-red-500/10 text-red-400 font-bold rounded-xl border border-red-500/20 active:scale-95 flex items-center justify-center gap-2"
+                >
+                    <Trash2 size={16}/> 重置對話紀錄
+                </button>
+            </div>
+        </div>
+      )}
+
+      {/* 聊天內容區 */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
          {messages.map((m, i) => (
            <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}>
-             <div className={`max-w-[85%] p-3 rounded-2xl text-sm leading-relaxed allow-select ${m.role === 'user' ? 'bg-purple-600 text-white rounded-br-none' : 'bg-[#252630] text-gray-200 rounded-bl-none border border-white/5'}`}>{m.text}</div>
+             <div className={`max-w-[85%] p-3 rounded-2xl text-sm leading-relaxed allow-select shadow-lg ${m.role === 'user' ? 'bg-purple-600 text-white rounded-br-none' : 'bg-[#252630] text-gray-200 rounded-bl-none border border-white/5'}`}>
+               <div className="font-bold text-[10px] mb-1 opacity-50">{m.role === 'user' ? '你' : charConfig.name}</div>
+               {m.text}
+             </div>
            </div>
          ))}
-         {loading && <div className="text-xs text-gray-500 animate-pulse ml-2 flex items-center gap-1"><Sparkles size={12}/> 角色正在輸入...</div>}
+         {loading && <div className="text-xs text-gray-500 animate-pulse ml-2 flex items-center gap-1"><Sparkles size={12}/> {charConfig.name} 正在輸入...</div>}
          <div ref={bottomRef} />
       </div>
+
+      {/* 輸入區 (Sticky + Safe Area) */}
       <div className="p-4 pb-10 bg-[#1a1b23] sticky bottom-0 z-20 border-t border-white/5 safe-bottom">
          <div className="bg-[#252630] rounded-[24px] p-1.5 pl-5 flex items-center shadow-lg border border-white/5">
-            <input className="flex-1 bg-transparent outline-none text-white text-sm h-10 placeholder-gray-500" placeholder="輸入你想說的話..." value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendMessage()}/>
-            <button onClick={sendMessage} disabled={loading} className={`w-10 h-10 rounded-full flex items-center justify-center text-white shadow-lg transition-transform ${loading?'bg-gray-600':'bg-purple-600 active:scale-90'}`}><Send size={18} className="ml-0.5"/></button>
+            <input 
+                className="flex-1 bg-transparent outline-none text-white text-sm h-10 placeholder-gray-500" 
+                placeholder={`跟 ${charConfig.name} 說點什麼...`} 
+                value={input} 
+                onChange={e => setInput(e.target.value)} 
+                onKeyDown={e => e.key === 'Enter' && sendMessage()}
+            />
+            <button onClick={sendMessage} disabled={loading} className={`w-10 h-10 rounded-full flex items-center justify-center text-white shadow-lg transition-transform ${loading?'bg-gray-600':'bg-purple-600 active:scale-90'}`}>
+                <Send size={18} className="ml-0.5"/>
+            </button>
          </div>
       </div>
     </div>
@@ -187,6 +362,7 @@ const SlotMachine = ({ isDark, apiKey, onResult }) => {
   const [spinning, setSpinning] = useState(false);
   const [slots, setSlots] = useState(["先婚後愛", "娛樂圈", "破鏡重圓"]);
   const [loading, setLoading] = useState(false);
+  
   const handleSpin = async () => {
     if(!apiKey) return alert("請先到「我」的頁面設定 API Key！");
     setSpinning(true);
@@ -227,24 +403,22 @@ const SlotMachine = ({ isDark, apiKey, onResult }) => {
           {slots.map((text, i) => (<NeuBox key={i} isDark={isDark} pressed className={`flex-1 h-16 flex items-center justify-center text-xs font-bold text-center px-1 ${spinning ? 'opacity-50 blur-[1px]' : 'text-purple-500'}`}>{text}</NeuBox>))}
        </div>
        <NeuBox isDark={isDark} onClick={handleSpin} className={`w-full py-4 flex items-center justify-center gap-2 font-bold text-sm ${spinning ? 'opacity-50' : 'text-purple-500'}`}>
-          {spinning ? "轉動中..." : loading ? "AI 正在寫作..." : <><Dice5 size={20}/> 隨機拉霸 + 生成</>}
+          {spinning ? "轉動中..." : loading ? <span className="animate-pulse">✨ AI 正在燃燒腦細胞...</span> : <><Dice5 size={20}/> 隨機拉霸 + 生成</>}
        </NeuBox>
     </NeuBox>
   );
 };
 
-// --- 頁面: 靈感庫 (含搜尋、編輯、刪除確認) ---
+// --- 頁面: 靈感庫 (搜尋、編輯、刪除) ---
 const PageVault = ({ isDark, apiKey }) => {
   const [tab, setTab] = useState('snippet'); 
-  const [items, setItems] = useState(() => { try { return JSON.parse(localStorage.getItem('memo_vault') || '[]'); } catch { return []; } }); 
+  const [items, setItems] = useState(() => { try { const data = JSON.parse(localStorage.getItem('memo_vault') || '[]'); return Array.isArray(data) ? data : []; } catch { return []; } }); 
   const [newItemContent, setNewItemContent] = useState(''); 
   const [isAdding, setIsAdding] = useState(false); 
   const [slotResult, setSlotResult] = useState("");
   const [editingId, setEditingId] = useState(null); 
   const [editContent, setEditContent] = useState(""); 
-  
-  // ★★★ 新增：搜尋關鍵字狀態 ★★★
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(""); // 搜尋關鍵字
 
   useEffect(() => { localStorage.setItem('memo_vault', JSON.stringify(items)); }, [items]); 
   
@@ -274,9 +448,10 @@ const PageVault = ({ isDark, apiKey }) => {
       }
   };
   
-  // ★★★ 修改：過濾邏輯加入搜尋 ★★★
+  // 搜尋過濾邏輯
   const filteredItems = items.filter(i => {
     const matchTab = i.type === tab;
+    // 防呆：確保 i.content 存在
     const matchSearch = (i.content || "").toLowerCase().includes(searchTerm.toLowerCase());
     return matchTab && matchSearch;
   });
@@ -287,7 +462,7 @@ const PageVault = ({ isDark, apiKey }) => {
     <div className="space-y-4 animate-fade-in pb-32 h-full flex flex-col">
        <div className="flex items-center gap-2 opacity-60 px-2 mt-2"><Package size={20}/> <h2 className="text-xl font-bold">靈感庫</h2></div>
        
-       {/* ★★★ 新增：搜尋列 ★★★ */}
+       {/* 搜尋列 */}
        <div className="px-1">
          <div className={`flex items-center px-3 py-2 rounded-xl border ${isDark ? 'bg-black/20 border-white/10' : 'bg-white/40 border-black/5'}`}>
             <Search size={14} className="opacity-50 mr-2"/>
@@ -369,7 +544,7 @@ const PageVault = ({ isDark, apiKey }) => {
   );
 };
 
-// --- 頁面: 續寫 (終極防護修復版：已加入三道防護網) ---
+// --- 頁面: 續寫 (終極防護修復版：三道防護網) ---
 const PageMemo = ({ isDark, apiKey, setShowChat }) => {
   // ★★★ 防護網 1：初始化資料庫 (確保永遠不會是空陣列，且自動補齊舊資料的 lastModified) ★★★
   const [files, setFiles] = useState(() => {
@@ -442,7 +617,7 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
   const deleteFile = (e, id) => {
     e.stopPropagation();
     if (files.length <= 1) return alert("至少要保留一個檔案喔！");
-    if (window.confirm("確定要刪除這個檔案嗎？無法復原喔。")) {
+    if (window.confirm("確定要刪除這個檔案嗎？")) {
       const newFiles = files.filter(f => f.id !== id);
       setFiles(newFiles);
       if (activeFileId === id) setActiveFileId(newFiles[0].id);
@@ -528,7 +703,7 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
                        <FileText size={18} className={activeFileId === file.id ? 'opacity-100' : 'opacity-50'}/>
                        <div className="flex flex-col truncate">
                          <span className="text-sm font-bold truncate">{file.title}</span>
-                         {/* ★★★ 這裡也加了防呆 ★★★ */}
+                         {/* ★★★ 防呆：防止 .split() 報錯 ★★★ */}
                          <span className="text-[10px] opacity-60">{(file.lastModified || "").split(' ')[0]}</span>
                        </div>
                      </div>
@@ -545,6 +720,7 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
                  <FilePlus size={18}/> 新增檔案
                </button>
             </div>
+            {/* 遮罩背景 */}
             <div className="flex-1 bg-black/50" onClick={() => setShowFileList(false)}></div>
          </div>
        )}
@@ -617,7 +793,6 @@ const PageGenerator = ({ isDark, apiKey }) => {
   const saveToVault = (content, type = 'snippet') => {
       if(!content) return;
       const vault = JSON.parse(localStorage.getItem('memo_vault') || '[]');
-      // 這裡 type 預設存為 'snippet' (碎片)，人設表則存為 'char' (人設)
       const newItem = { id: Date.now(), type: type, content: content, date: new Date().toLocaleDateString() };
       localStorage.setItem('memo_vault', JSON.stringify([newItem, ...vault]));
       alert("✅ 已存入靈感庫！");
@@ -721,7 +896,8 @@ const PageMe = ({ isDark, apiKey, setApiKey, themeMode, setThemeMode }) => {
       memo_draft: localStorage.getItem('memo_draft'),
       memo_vault: localStorage.getItem('memo_vault'),
       gemini_key: localStorage.getItem('gemini_key'),
-      theme_mode: localStorage.getItem('theme_mode')
+      theme_mode: localStorage.getItem('theme_mode'),
+      memo_files: localStorage.getItem('memo_files')
     };
     const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -740,6 +916,7 @@ const PageMe = ({ isDark, apiKey, setApiKey, themeMode, setThemeMode }) => {
     reader.onload = (e) => {
       try {
         const data = JSON.parse(e.target.result);
+        if(data.memo_files) localStorage.setItem('memo_files', data.memo_files);
         if(data.memo_draft) localStorage.setItem('memo_draft', data.memo_draft);
         if(data.memo_vault) localStorage.setItem('memo_vault', data.memo_vault);
         if(data.gemini_key) localStorage.setItem('gemini_key', data.gemini_key);
