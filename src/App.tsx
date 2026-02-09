@@ -483,7 +483,14 @@ const SlotMachine = ({ isDark, apiKey, onResult }) => {
 // --- 7. 靈感庫頁面 (含搜尋、編輯、刪除確認) ---
 const PageVault = ({ isDark, apiKey }) => {
   const [tab, setTab] = useState('snippet'); 
-  const [items, setItems] = useState(() => { try { return JSON.parse(localStorage.getItem('memo_vault') || '[]'); } catch { return []; } }); 
+  const [items, setItems] = useState(() => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem('memo_vault') || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}); 
   const [newItemContent, setNewItemContent] = useState(''); 
   const [isAdding, setIsAdding] = useState(false); 
   const [slotResult, setSlotResult] = useState("");
@@ -509,19 +516,26 @@ const PageVault = ({ isDark, apiKey }) => {
   setSlotResult("");
 };
 
+const startEditing = (item) => {
+  setEditingId(item.id);
+  setEditContent(item.content);
+};
+
 const updateItem = (id) => {
   if (!editContent.trim()) return;
-  setItems(prev => (Array.isArray(prev) ? prev : []).map(item => item.id === id ? { ...item, content: editContent } : item));
+  setItems(prev =>
+    (Array.isArray(prev) ? prev : []).map(item =>
+      item.id === id ? { ...item, content: editContent } : item
+    )
+  );
   setEditingId(null);
   setEditContent("");
+};
 
-  const startEditing = (item) => {
-    setEditingId(item.id);
-    setEditContent(item.content);
-  };
-
-  const confirmDelete = (id) => {
-  if (window.confirm("確定要將這條靈感丟進垃圾桶嗎？")) setItems(prev => (Array.isArray(prev) ? prev : []).filter(i => i.id !== id));
+const confirmDelete = (id) => {
+  if (window.confirm("確定要將這條靈感丟進垃圾桶嗎？")) {
+    setItems(prev => (Array.isArray(prev) ? prev : []).filter(i => i.id !== id));
+  }
 };
   
   // ★★★ 修改：過濾邏輯加入搜尋 ★★★
