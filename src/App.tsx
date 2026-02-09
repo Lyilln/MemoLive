@@ -49,7 +49,6 @@ const NeuBox = ({ children, className = '', pressed = false, onClick, isDark, ac
 };
 
 // --- 導航列 ---
-// --- 修正後的 Navigation (打字時自動隱藏，避免擋住鍵盤) ---
 const Navigation = ({ activeTab, setActiveTab, isDark }) => {
   const [isVisible, setIsVisible] = useState(true);
 
@@ -103,7 +102,6 @@ const Navigation = ({ activeTab, setActiveTab, isDark }) => {
 };
 
 // --- 對話介面 (真實串接 AI + 自動捲動) ---
-// --- 對話介面 (修正版：找回 Sticky 輸入框) ---
 const ChatInterface = ({ onClose }) => {
   const [messages, setMessages] = useState([{role: 'ai', text: '（探頭）我是你的角色靈魂... 你想跟我聊什麼劇情？'}]);
   const [input, setInput] = useState("");
