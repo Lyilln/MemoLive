@@ -276,13 +276,15 @@ const SlotMachine = ({ isDark, apiKey, onResult }) => {
 // --- 頁面: 靈感庫 ---
 const PageVault = ({ isDark, apiKey }) => {
   const [tab, setTab] = useState('snippet'); 
-  // 這裡就是你的「資料庫」，它會讀取手機裡的 memo_vault 存檔
   const [items, setItems] = useState(() => { try { return JSON.parse(localStorage.getItem('memo_vault') || '[]'); } catch { return []; } }); 
   const [newItemContent, setNewItemContent] = useState(''); 
   const [isAdding, setIsAdding] = useState(false); 
   const [slotResult, setSlotResult] = useState("");
 
-  // 當 items 改變時，自動存入手機資料庫
+  // ★★★ 新增：編輯狀態管理 ★★★
+  const [editingId, setEditingId] = useState(null); 
+  const [editContent, setEditContent] = useState(""); 
+
   useEffect(() => { localStorage.setItem('memo_vault', JSON.stringify(items)); }, [items]); 
   
   const addItem = (content = newItemContent, type = tab) => { 
@@ -292,6 +294,20 @@ const PageVault = ({ isDark, apiKey }) => {
       setIsAdding(false); 
       setSlotResult(""); 
   }; 
+
+  // ★★★ 新增：更新項目 ★★★
+  const updateItem = (id) => {
+    if (!editContent.trim()) return;
+    setItems(items.map(item => item.id === id ? { ...item, content: editContent } : item));
+    setEditingId(null); 
+    setEditContent("");
+  };
+
+  // ★★★ 新增：開始編輯 ★★★
+  const startEditing = (item) => {
+    setEditingId(item.id);
+    setEditContent(item.content);
+  };
   
   const filteredItems = items.filter(i => i.type === tab); 
   const TabBtn = ({ id, label, icon: Icon }) => ( <NeuBox isDark={isDark} active={tab === id} onClick={() => setTab(id)} className="flex-1 py-3 flex justify-center items-center gap-2 text-xs font-bold"><Icon size={16}/> {label} </NeuBox> );
@@ -302,12 +318,11 @@ const PageVault = ({ isDark, apiKey }) => {
        
        <SlotMachine isDark={isDark} apiKey={apiKey} onResult={setSlotResult} />
        
-       {/* 拉霸結果展示區 */}
        {slotResult && ( 
          <div className="animate-fade-in mb-2">
             <div className="flex justify-between items-center px-2 mb-2 opacity-70"><span className="text-xs font-bold text-purple-400">🎉 生成結果</span></div>
             <NeuBox isDark={isDark} className="p-4 relative border border-purple-500/30">
-               <div className="text-sm whitespace-pre-wrap leading-relaxed max-h-40 overflow-y-auto pr-2 custom-scrollbar">{slotResult}</div>
+               <div className="text-sm whitespace-pre-wrap leading-relaxed max-h-40 overflow-y-auto pr-2 custom-scrollbar allow-select">{slotResult}</div>
                <div className="flex gap-3 mt-3 pt-3 border-t border-white/5">
                   <button onClick={() => addItem(slotResult, 'snippet')} className="flex-1 py-2 bg-purple-600 rounded-xl text-white text-xs font-bold shadow-lg active:scale-95">存入碎片</button>
                   <button onClick={() => setSlotResult("")} className="px-4 py-2 text-gray-500 text-xs font-bold active:scale-95">捨棄</button>
@@ -321,7 +336,7 @@ const PageVault = ({ isDark, apiKey }) => {
        {isAdding ? ( 
           <div className="animate-fade-in space-y-3 z-10">
             <NeuBox isDark={isDark} pressed className="p-4 border border-purple-500/50">
-              <textarea autoFocus className="w-full h-24 bg-transparent outline-none resize-none text-sm placeholder-opacity-50" placeholder="輸入靈感..." value={newItemContent} onChange={e=>setNewItemContent(e.target.value)}/>
+              <textarea autoFocus className="w-full h-24 bg-transparent outline-none resize-none text-sm placeholder-opacity-50 allow-select" placeholder="輸入靈感..." value={newItemContent} onChange={e=>setNewItemContent(e.target.value)}/>
             </NeuBox>
             <div className="flex gap-3">
               <NeuBox isDark={isDark} onClick={() => addItem()} className="flex-1 py-3 text-purple-500 text-sm font-bold flex justify-center bg-purple-500/10">確認儲存</NeuBox>
@@ -332,8 +347,6 @@ const PageVault = ({ isDark, apiKey }) => {
          <NeuBox isDark={isDark} onClick={()=>setIsAdding(true)} className="py-3 flex justify-center items-center gap-2 text-purple-500 opacity-80 text-sm font-bold border border-dashed border-purple-500/30 active:scale-95"><Plus size={16}/> 新增項目</NeuBox> 
        )}
        
-       {/* ★★★ 資料庫大框框 (Storage Box) ★★★ */}
-       {/* 這裡就是你要的「大框框」，我做了凹陷效果，讓它看起來像個資料儲存區 */}
        <div className={`flex-grow overflow-hidden rounded-[24px] p-1 ${isDark ? 'bg-[#161722]/50 shadow-[inset_2px_2px_6px_#0b0c15,inset_-2px_-2px_6px_#2a2c38]' : 'bg-[#D1D9E6] shadow-[inset_2px_2px_6px_#b8b9be,inset_-2px_-2px_6px_#ffffff]'}`}>
          <div className="h-full overflow-y-auto p-3 space-y-3 no-scrollbar">
             {filteredItems.length === 0 && !isAdding && (
@@ -344,14 +357,38 @@ const PageVault = ({ isDark, apiKey }) => {
             )}
             {filteredItems.map(item => (
               <NeuBox key={item.id} isDark={isDark} className="p-4 relative group animate-fade-in border border-white/5">
-                <div className="whitespace-pre-wrap text-sm leading-relaxed opacity-90">{item.content}</div>
-                <div className="flex justify-between items-center mt-3 pt-3 border-t border-white/5 opacity-50">
-                  <span className="text-[10px] font-bold tracking-wider">{item.date}</span>
-                  {/* 這就是之前導致黑屏的按鈕，現在有了 Trash2 就不會崩潰了 */}
-                  <button onClick={(e)=>{e.stopPropagation(); setItems(items.filter(i=>i.id!==item.id))}} className="p-2 text-red-400 hover:text-red-500 active:scale-90 transition-transform">
-                    <Trash2 size={16}/>
-                  </button>
-                </div>
+                {/* ★★★ 編輯模式切換邏輯 ★★★ */}
+                {editingId === item.id ? (
+                    <div className="space-y-3 animate-fade-in">
+                        <textarea 
+                            autoFocus
+                            className="w-full h-32 bg-black/20 rounded-lg p-2 text-sm outline-none resize-none text-gray-200 allow-select" 
+                            value={editContent} 
+                            onChange={e => setEditContent(e.target.value)}
+                        />
+                        <div className="flex gap-2 justify-end">
+                            <button onClick={() => setEditingId(null)} className="px-3 py-1.5 text-xs text-gray-400 font-bold active:scale-95">取消</button>
+                            <button onClick={() => updateItem(item.id)} className="px-3 py-1.5 bg-purple-600 text-white text-xs rounded-lg shadow-lg font-bold active:scale-95">保存修改</button>
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        <div className="whitespace-pre-wrap text-sm leading-relaxed opacity-90 allow-select">{item.content}</div>
+                        <div className="flex justify-between items-center mt-3 pt-3 border-t border-white/5 opacity-50">
+                            <span className="text-[10px] font-bold tracking-wider">{item.date}</span>
+                            <div className="flex gap-3">
+                                {/* 編輯按鈕 */}
+                                <button onClick={(e)=>{e.stopPropagation(); startEditing(item)}} className="p-2 text-blue-400 hover:text-blue-500 active:scale-90 transition-transform">
+                                    <Edit3 size={16}/>
+                                </button>
+                                {/* 刪除按鈕 */}
+                                <button onClick={(e)=>{e.stopPropagation(); setItems(items.filter(i=>i.id!==item.id))}} className="p-2 text-red-400 hover:text-red-500 active:scale-90 transition-transform">
+                                    <Trash2 size={16}/>
+                                </button>
+                            </div>
+                        </div>
+                    </>
+                )}
               </NeuBox>
             ))}
          </div>
@@ -360,15 +397,17 @@ const PageVault = ({ isDark, apiKey }) => {
   );
 };
 
+};
+
 // --- 頁面: 續寫 (萬字支援 + 擴寫魔杖 + 1500字 + 聯網) ---
 const PageMemo = ({ isDark, apiKey, setShowChat }) => {
-  // 1. 修改：初始值從 localStorage 讀取 (解決資料遺失)
+  // ★★★ 修改：初始值從 localStorage 讀取 (防止資料遺失) ★★★
   const [note, setNote] = useState(() => localStorage.getItem("memo_draft") || "");
   const [res, setRes] = useState("");
   const [loading, setLoading] = useState(false);
   const textAreaRef = useRef(null);
 
-  // 2. 新增：監聽 note 變化，自動存入手機 (解決資料遺失)
+  // ★★★ 新增：當 note 內容改變，自動存入手機 ★★★
   useEffect(() => {
     localStorage.setItem("memo_draft", note);
   }, [note]);
@@ -403,7 +442,7 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
     } catch(e) { alert(e.message); } finally { setLoading(false); }
   };
 
-  // 3. 新增：一鍵插入功能 (解決操作不便)
+  // ★★★ 新增：一鍵插入功能 (合併內文) ★★★
   const insertText = () => {
     if(!res) return;
     setNote(prev => prev + "\n\n" + res); // 接在文章最後面 (加兩個換行)
@@ -423,6 +462,7 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
             onChange={e=>setNote(e.target.value)} 
             maxLength={50000} 
          />
+         {/* 擴寫按鈕 */}
          <button onClick={expandSentence} className="absolute bottom-4 right-4 p-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full shadow-lg text-white active:scale-90 transition-transform flex items-center justify-center" title="✨ 擴寫選取文字"><Wand2 size={20}/></button>
        </NeuBox>
        <div className="flex gap-4">
@@ -436,7 +476,7 @@ const PageMemo = ({ isDark, apiKey, setShowChat }) => {
              <NeuBox isDark={isDark} className="p-6 min-h-[250px] text-sm whitespace-pre-wrap leading-relaxed allow-select">
                 {res || <span className="opacity-20 text-xs flex items-center justify-center h-full">等待生成...</span>}
              </NeuBox>
-             {/* 4. 按鈕：插入內文 */}
+             {/* ★★★ 插入內文按鈕 ★★★ */}
              {res && (
                 <button onClick={insertText} className="absolute bottom-4 right-4 flex items-center gap-1 bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-lg active:scale-95 transition-transform">
                    <PenTool size={14}/> 插入內文
