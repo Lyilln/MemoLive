@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-// ★★★ 確保所有圖示引入完整，絕不白畫面 ★★★
+// ★★★ 1. 確保所有圖示引入完整 (無遺漏) ★★★
 import { 
   Sparkles, Zap, Edit3, User, List, Package, Plus, X, 
   ChevronLeft, Share2, MoreHorizontal, Send, Copy, Settings, 
@@ -9,9 +9,9 @@ import {
   ChevronRight, Menu 
 } from 'lucide-react';
 
-// --- 1. 全局樣式區塊 (含動畫與 iPhone 適配) ---
+// --- 2. 全局樣式區塊 (包含所有動畫與 iPhone 適配) ---
 const styles = `
-  /* 進場動畫 */
+  /* 基礎淡入動畫 */
   @keyframes fade-in { 
     from { opacity: 0; transform: translateY(10px); } 
     to { opacity: 1; transform: translateY(0); } 
@@ -20,7 +20,7 @@ const styles = `
     animation: fade-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; 
   }
   
-  /* 左側滑入動畫 (檔案櫃) */
+  /* 左側邊欄滑入動畫 (檔案櫃用) */
   @keyframes slide-in-left { 
     from { transform: translateX(-100%); } 
     to { transform: translateX(0); } 
@@ -29,7 +29,7 @@ const styles = `
     animation: slide-in-left 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; 
   }
 
-  /* 右側滑入動畫 (角色設定) */
+  /* 右側邊欄滑入動畫 (角色設定用) */
   @keyframes slide-in-right { 
     from { transform: translateX(100%); } 
     to { transform: translateX(0); } 
@@ -38,7 +38,7 @@ const styles = `
     animation: slide-in-right 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; 
   }
 
-  /* 呼吸燈效果 */
+  /* 呼吸燈效果 (Logo用) */
   @keyframes pulse-glow { 
     0%, 100% { opacity: 1; transform: scale(1); filter: drop-shadow(0 0 10px rgba(168,85,247,0.4)); } 
     50% { opacity: 0.7; transform: scale(0.95); filter: drop-shadow(0 0 20px rgba(168,85,247,0.8)); } 
@@ -47,25 +47,34 @@ const styles = `
     animation: pulse-glow 2.5s infinite ease-in-out; 
   }
 
+  /* 開場動畫退場 */
+  @keyframes splash-out { 
+    from { opacity: 1; transform: translateY(0); } 
+    to { opacity: 0; transform: translateY(-20px); pointer-events: none; } 
+  }
+  .animate-splash-out { 
+    animation: splash-out 0.6s ease-in-out forwards; 
+  }
+
   /* 禁止橡皮筋回彈 & 點擊高亮 (App 質感關鍵) */
   body { 
     overscroll-behavior-y: none; 
     -webkit-tap-highlight-color: transparent; 
   }
 
-  /* 隱藏捲軸但保留功能 */
+  /* 隱藏捲軸但保留滾動功能 */
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-  /* 允許選取文字 */
+  /* 允許選取文字 (對寫作 App 很重要) */
   .allow-select { user-select: text; -webkit-user-select: text; }
   
-  /* 適配 iPhone 瀏海與 Home Bar */
+  /* 適配 iPhone 瀏海與 Home Bar (安全區域) */
   .safe-top { padding-top: env(safe-area-inset-top); }
   .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
 `;
 
-// --- 核心元件：新擬態盒子 (NeuBox) ---
+// --- 3. 核心元件：新擬態盒子 (NeuBox) ---
 const NeuBox = ({ children, className = '', pressed = false, onClick, isDark, active = false, border = false }) => {
   const darkShadow = active || pressed 
     ? 'shadow-[inset_4px_4px_8px_#161722,inset_-4px_-4px_8px_#2a2c40] bg-[#202130]' 
@@ -92,12 +101,12 @@ const NeuBox = ({ children, className = '', pressed = false, onClick, isDark, ac
   );
 };
 
-// --- 導航列 (打字或開側邊欄時自動隱藏) ---
+// --- 4. 導航列 (具備自動隱藏功能) ---
 const Navigation = ({ activeTab, setActiveTab, isDark, forceHide }) => {
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
-    // 偵測是否正在輸入
+    // 偵測是否正在輸入 (鍵盤彈出)
     const handleFocus = (e) => {
       const tag = e.target.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') {
@@ -124,7 +133,7 @@ const Navigation = ({ activeTab, setActiveTab, isDark, forceHide }) => {
     };
   }, []);
 
-  // 如果 forceHide (側邊欄打開) 為 true，強制隱藏
+  // 如果 forceHide (側邊欄打開) 為 true，強制隱藏導航列
   const shouldShow = isVisible && !forceHide;
 
   return (
@@ -154,7 +163,7 @@ const NavIcon = ({ icon: Icon, label, active, onClick, isDark }) => (
   </div>
 );
 
-// --- API 核心 (保留你指定的 Gemini 2.5) ---
+// --- 5. API 核心 (保留你指定的 Gemini 2.5 版本) ---
 const callGemini = async (apiKey, prompt, useWeb = false) => {
   const tools = useWeb ? [{ googleSearch: {} }] : [];
   
@@ -174,7 +183,7 @@ const callGemini = async (apiKey, prompt, useWeb = false) => {
   return textPart ? textPart.text : "生成成功 (內容包含非文字資訊)";
 };
 
-// --- 對話介面 (升級版：含側邊設定欄 + 雙重分享功能) ---
+// --- 6. 對話介面 (升級版：含右側設定欄 + 雙重分享功能) ---
 const ChatInterface = ({ onClose }) => {
   // 角色設定狀態 (預設值)
   const [charConfig, setCharConfig] = useState(() => {
@@ -188,7 +197,7 @@ const ChatInterface = ({ onClose }) => {
   const [messages, setMessages] = useState([{role: 'ai', text: `（看著你）我是 ${charConfig.name}。找我... 有事嗎？`}]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showSidebar, setShowSidebar] = useState(false); // 控制聊天設定側邊欄
+  const [showSidebar, setShowSidebar] = useState(false); // 控制右側設定欄
   const bottomRef = useRef(null);
   const apiKey = localStorage.getItem("gemini_key");
 
@@ -209,7 +218,7 @@ const ChatInterface = ({ onClose }) => {
     setLoading(true);
 
     try {
-      // 🔴 關鍵升級：將角色設定注入 Prompt
+      // 🔴 關鍵升級：將角色設定注入 Prompt，讓 AI 知道它是誰
       const prompt = `System: 你現在正在進行角色扮演 (Roleplay)。
       你的角色名稱：${charConfig.name}
       你的詳細設定/人設：${charConfig.setting}
@@ -277,13 +286,13 @@ const ChatInterface = ({ onClose }) => {
             <div className="flex gap-4 text-gray-400">
                 {/* 分享按鈕 (圖一圈選處) */}
                 <button onClick={handleShare} className="active:scale-90 active:text-purple-500 transition-transform"><Share2 size={20}/></button>
-                {/* 設定選單按鈕 (圖一圈選處) */}
+                {/* 設定選單按鈕 (圖一圈選處，開啟右側欄) */}
                 <button onClick={() => setShowSidebar(true)} className="active:scale-90 active:text-purple-500 transition-transform"><MoreHorizontal size={20}/></button>
             </div>
         </div>
       </div>
 
-      {/* ★★★ 角色設定側邊欄 (Sidebar - 圖二功能) ★★★ */}
+      {/* ★★★ 右側角色設定側邊欄 (Sidebar) ★★★ */}
       {showSidebar && (
         <div className="fixed inset-0 z-[200] flex justify-end safe-top safe-bottom">
             {/* 背景遮罩 (點擊關閉) */}
@@ -363,7 +372,7 @@ const ChatInterface = ({ onClose }) => {
   );
 };
 
-// --- 拉霸機 ---
+// --- 7. 拉霸機元件 ---
 const SlotMachine = ({ isDark, apiKey, onResult }) => {
   const [spinning, setSpinning] = useState(false);
   const [slots, setSlots] = useState(["先婚後愛", "娛樂圈", "破鏡重圓"]);
@@ -415,7 +424,7 @@ const SlotMachine = ({ isDark, apiKey, onResult }) => {
   );
 };
 
-// --- 頁面: 靈感庫 (含搜尋、編輯、刪除確認) ---
+// --- 8. 靈感庫頁面 (含搜尋、編輯、刪除確認) ---
 const PageVault = ({ isDark, apiKey }) => {
   const [tab, setTab] = useState('snippet'); 
   const [items, setItems] = useState(() => { try { return JSON.parse(localStorage.getItem('memo_vault') || '[]'); } catch { return []; } }); 
@@ -456,7 +465,7 @@ const PageVault = ({ isDark, apiKey }) => {
       }
   };
   
-  // ★★★ 修改：過濾邏輯加入搜尋 ★★★
+  // ★★★ 搜尋過濾邏輯 ★★★
   const filteredItems = items.filter(i => {
     const matchTab = i.type === tab;
     // 防呆：確保 i.content 存在
@@ -470,7 +479,7 @@ const PageVault = ({ isDark, apiKey }) => {
     <div className="space-y-4 animate-fade-in pb-32 h-full flex flex-col">
        <div className="flex items-center gap-2 opacity-60 px-2 mt-2"><Package size={20}/> <h2 className="text-xl font-bold">靈感庫</h2></div>
        
-       {/* ★★★ 新增：搜尋列 ★★★ */}
+       {/* ★★★ 搜尋列 ★★★ */}
        <div className="px-1">
          <div className={`flex items-center px-3 py-2 rounded-xl border ${isDark ? 'bg-black/20 border-white/10' : 'bg-white/40 border-black/5'}`}>
             <Search size={14} className="opacity-50 mr-2"/>
@@ -552,13 +561,13 @@ const PageVault = ({ isDark, apiKey }) => {
   );
 };
 
-// --- 頁面: 續寫 (終極防護修復版：三道防護網) ---
+// --- 9. 續寫頁面 (終極防護修復版：三道防護網 + 暴力考據 Prompt) ---
 const PageMemo = ({ isDark, apiKey, setShowChat, files, setFiles, activeFileId, setActiveFileId }) => {
   const [res, setRes] = useState("");
   const [loading, setLoading] = useState(false);
   const textAreaRef = useRef(null);
 
-  // ★★★ 防護網 3：取得 activeFile 時，如果找不到，回傳一個安全的空物件 ★★★
+  // ★★★ 防護：取得 activeFile 時，如果找不到，回傳一個安全的空物件 ★★★
   const activeFile = files.find(f => f.id === activeFileId) || { title: "Error", content: "", lastModified: new Date().toLocaleString() };
 
   const updateContent = (newContent) => {
@@ -574,7 +583,21 @@ const PageMemo = ({ isDark, apiKey, setShowChat, files, setFiles, activeFileId, 
     if (!activeFile.content) return alert("內容不能為空");
     setLoading(true);
     try {
-      const prompt = `角色：同人小說家。任務：續寫文章。步驟：1.分析原文人物性格(OOC禁止)、風格。2.聯網確認偶像/影視資訊。3.續寫長度需達【1500字以上】。原文：${activeFile.content}`;
+      // 🔴 這裡就是你的要求：禁止廢話、強制搜尋、禁止OOC、平行時空
+      const prompt = `
+        角色：頂尖同人小說家。
+        任務：續寫這篇小說。
+        
+        【極重要指令 - 絕對遵守】：
+        1. ⛔ **絕對禁止輸出前言/後語**：直接從小說內文開始寫，不要說「好的」、「以下是續寫」等廢話。我只要內文。
+        2. 🔍 **強制聯網考據**：請仔細偵測原文中的人名與團體。如果是現實存在的偶像(如 TripleS, LOONA, ARTMS 等)，**必須使用 Google Search 驗證**成員名單、正確設定與現實背景。**嚴禁**捏造假團名(如 S*TARS)或錯誤設定，除非原文已明確建立完全架空的世界觀。
+        3. 🚫 **OOC 禁止**：嚴格遵守人物原本的說話語氣與性格，捕捉人物神韻。
+        4. 🌌 **世界觀偵測**：如果原文提及「平行時空」或特定設定，請嚴格遵循該設定進行續寫。
+        5. 📏 **長度**：請寫出 1500 字以上的高質量內容。
+        
+        【原文】：
+        ${activeFile.content}
+      `;
       const text = await callGemini(apiKey, prompt, true);
       setRes(text);
     } catch (e) { alert(e.message); } finally { setLoading(false); }
@@ -592,7 +615,7 @@ const PageMemo = ({ isDark, apiKey, setShowChat, files, setFiles, activeFileId, 
 
     setLoading(true);
     try {
-        const prompt = `角色：細膩的文學家。任務：請將這句話擴寫成一段充滿畫面感、微表情、動作與環境描寫的細膩段落（約 50-100 字）。請保持原意，但大幅增加質感。原句：${selectedText}`;
+        const prompt = `擴寫這段文字，使其更細膩、更有畫面感：${selectedText}`;
         const expandedText = await callGemini(apiKey, prompt, false);
         const newText = activeFile.content.substring(0, start) + expandedText + activeFile.content.substring(end);
         updateContent(newText);
@@ -610,7 +633,6 @@ const PageMemo = ({ isDark, apiKey, setShowChat, files, setFiles, activeFileId, 
     <div className="space-y-5 animate-fade-in pb-32 relative">
        {/* 標題與檔案切換區 */}
        <div className="flex items-center gap-3 mt-2">
-          {/* 因為已經有全域側邊欄，這裡的按鈕可以拿掉，或是作為快捷鍵 */}
           <div className="flex-1">
             <input 
               className="w-full bg-transparent text-xl font-bold outline-none placeholder-opacity-50 text-purple-400" 
@@ -632,7 +654,7 @@ const PageMemo = ({ isDark, apiKey, setShowChat, files, setFiles, activeFileId, 
             onChange={e=>updateContent(e.target.value)} 
             maxLength={50000} 
          />
-         <button onClick={expandSentence} className="absolute bottom-4 right-4 p-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full shadow-lg text-white active:scale-90 transition-transform flex items-center justify-center" title="✨ 擴寫選取文字"><Wand2 size={20}/></button>
+         <button onClick={expandSentence} className="absolute bottom-4 right-4 p-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full shadow-lg text-white active:scale-90 transition-transform flex items-center justify-center" title="✨ 擴寫"><Wand2 size={20}/></button>
        </NeuBox>
 
        <div className="flex gap-4">
@@ -641,7 +663,7 @@ const PageMemo = ({ isDark, apiKey, setShowChat, files, setFiles, activeFileId, 
        </div>
 
        <div className="flex flex-col gap-3">
-          <div className="flex justify-between px-2 opacity-50"><span className="text-xs font-bold">AI 產出結果 (1500字+)</span>{res && <Copy size={14}/>}</div>
+          <div className="flex justify-between px-2 opacity-50"><span className="text-xs font-bold">AI 結果</span>{res && <Copy size={14}/>}</div>
           
           <div className="relative group">
              <NeuBox isDark={isDark} className="p-6 min-h-[250px] text-sm whitespace-pre-wrap leading-relaxed allow-select">
@@ -658,7 +680,7 @@ const PageMemo = ({ isDark, apiKey, setShowChat, files, setFiles, activeFileId, 
   );
 };
 
-// --- 頁面: 生成器 (包含：靈感生成(舊) + 潤色工具(新)) ---
+// --- 10. 生成器頁面 ---
 const PageGenerator = ({ isDark, apiKey }) => {
   const [subTab, setSubTab] = useState('generate');
   const [config, setConfig] = useState({ genre: "現代言情", tone: "甜寵", world: "", cp: "", trope: "" });
@@ -784,7 +806,7 @@ const PageGenerator = ({ isDark, apiKey }) => {
   );
 };
 
-// --- 頁面: 我 (修復：淺/深/系統 模式切換) ---
+// --- 11. 我的頁面 (修復：淺/深/系統 模式切換 + 備份還原) ---
 const PageMe = ({ isDark, apiKey, setApiKey, themeMode, setThemeMode, files }) => {
   const [show, setShow] = useState(false);
 
@@ -795,7 +817,7 @@ const PageMe = ({ isDark, apiKey, setApiKey, themeMode, setThemeMode, files }) =
       memo_vault: localStorage.getItem('memo_vault'),
       gemini_key: localStorage.getItem('gemini_key'),
       theme_mode: localStorage.getItem('theme_mode'),
-      memo_files: JSON.stringify(files) // 使用傳入的最新 files 狀態
+      memo_files: JSON.stringify(files) // 使用 App 傳來的最新 files
     };
     const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -876,34 +898,7 @@ const PageMe = ({ isDark, apiKey, setApiKey, themeMode, setThemeMode, files }) =
   );
 };
 
-// --- 2. 新增：開場動畫元件 ---
-const SplashScreen = ({ onFinish }) => {
-  const [fading, setFading] = useState(false);
-
-  useEffect(() => {
-    // 2秒後開始執行淡出動畫
-    const timer = setTimeout(() => setFading(true), 2000); 
-    // 動畫跑完(0.6秒)後，正式移除組件
-    const removeTimer = setTimeout(onFinish, 2600);
-    return () => { clearTimeout(timer); clearTimeout(removeTimer); };
-  }, [onFinish]);
-
-  return (
-    <div className={`fixed inset-0 z-[9999] bg-[#202130] flex flex-col items-center justify-center transition-all duration-500 ${fading ? 'animate-splash-out' : ''}`}>
-       <div className="relative w-24 h-24 flex items-center justify-center animate-pulse-glow">
-          <div className="absolute inset-0 bg-[#202130] rounded-[28px] shadow-[8px_8px_16px_#151620,-8px_-8px_16px_#2b2c40]"></div>
-          {/* Logo */}
-          <Edit3 size={40} className="text-purple-500 relative z-10" strokeWidth={2.5} />
-       </div>
-       <div className="mt-6 flex flex-col items-center gap-2">
-          <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-indigo-400 tracking-tight">MemoLive</h1>
-          <p className="text-[10px] font-bold text-gray-500 tracking-[0.3em] uppercase">Ultimate</p>
-       </div>
-    </div>
-  );
-};
-
-// --- App (主程式：狀態提升，解決側邊欄覆蓋問題) ---
+// --- 12. App 主程式 (全域狀態提升、解決側邊欄覆蓋問題) ---
 const App = () => {
   const [showSplash, setShowSplash] = useState(true); 
   const [activeTab, setActiveTab] = useState("memo");
@@ -911,9 +906,9 @@ const App = () => {
   const [themeMode, setThemeMode] = useState(localStorage.getItem("theme_mode") || "system");
   const [isDark, setIsDark] = useState(false);
   const [showChat, setShowChat] = useState(false);
-  const [showSidebar, setShowSidebar] = useState(false); // ★★★ 側邊欄狀態提升 ★★★
+  const [showSidebar, setShowSidebar] = useState(false); // ★★★ 左側檔案側邊欄狀態 ★★★
 
-  // ★★★ 全域防護：檔案管理狀態 (也提升到 App 層，防止黑屏) ★★★
+  // ★★★ 全域防護：檔案管理狀態 (提升到 App 層，防止黑屏) ★★★
   const [files, setFiles] = useState(() => {
     try {
       const saved = localStorage.getItem("memo_files");
@@ -933,9 +928,16 @@ const App = () => {
   useEffect(() => { if(files.length > 0) localStorage.setItem("memo_files", JSON.stringify(files)); }, [files]);
 
   useEffect(() => {
-    const applyTheme = () => { const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches; setIsDark(themeMode === 'system' ? systemDark : themeMode === 'dark'); };
-    applyTheme(); localStorage.setItem("theme_mode", themeMode);
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)'); mediaQuery.addEventListener('change', applyTheme); return () => mediaQuery.removeEventListener('change', applyTheme);
+    const applyTheme = () => {
+      const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const isDarkMode = themeMode === 'system' ? systemDark : themeMode === 'dark';
+      setIsDark(isDarkMode);
+    };
+    applyTheme();
+    localStorage.setItem("theme_mode", themeMode);
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    mediaQuery.addEventListener('change', applyTheme);
+    return () => mediaQuery.removeEventListener('change', applyTheme);
   }, [themeMode]);
 
   // 新增檔案邏輯
@@ -966,7 +968,7 @@ const App = () => {
       
       {/* 頂部 Header (含漢堡選單) */}
       <div className="pt-12 pb-4 px-4 flex items-center justify-center relative">
-        {/* ★★★ 左上角漢堡選單 (觸發側邊欄) ★★★ */}
+        {/* ★★★ 左上角漢堡選單 (觸發檔案側邊欄) ★★★ */}
         <button onClick={() => setShowSidebar(true)} className="absolute left-4 p-2 rounded-full active:bg-gray-500/20 transition-colors">
             <Menu size={24} className={isDark ? "text-white" : "text-gray-700"}/>
         </button>
@@ -977,7 +979,7 @@ const App = () => {
         </div>
       </div>
 
-      {/* ★★★ 全局側邊欄 (Global Drawer - 覆蓋一切) ★★★ */}
+      {/* ★★★ 全局左側邊欄 (Global Drawer - 覆蓋一切) ★★★ */}
       {showSidebar && (
         <div className="fixed inset-0 z-[100] flex safe-top safe-bottom">
             {/* 背景遮罩 */}
@@ -1005,6 +1007,7 @@ const App = () => {
                                 <FileText size={18} className={activeFileId === file.id ? 'opacity-100' : 'opacity-50'}/>
                                 <div className="flex flex-col truncate">
                                     <span className="text-sm font-bold truncate">{file.title}</span>
+                                    {/* ★★★ 防呆：防止 .split() 報錯 ★★★ */}
                                     <span className="text-[10px] opacity-60">{(file.lastModified || "").split(' ')[0]}</span>
                                 </div>
                             </div>
